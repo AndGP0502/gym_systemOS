@@ -53,9 +53,9 @@ struct RootView: View {
     private func detalle(for modulo: Modulo?) -> some View {
         switch modulo {
         case .clientes:
-            PlaceholderModuloView(modulo: .clientes)
+            ClientesView()
         case .suscripciones:
-            PlaceholderModuloView(modulo: .suscripciones)
+            SuscripcionesView()
         case .pagos:
             PlaceholderModuloView(modulo: .pagos)
         case .caducados:
