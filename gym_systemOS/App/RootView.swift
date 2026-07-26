@@ -57,9 +57,9 @@ struct RootView: View {
         case .suscripciones:
             SuscripcionesView()
         case .pagos:
-            PlaceholderModuloView(modulo: .pagos)
+            PagosView()
         case .caducados:
-            PlaceholderModuloView(modulo: .caducados)
+            CaducadosView()
         case .facturacion:
             PlaceholderModuloView(modulo: .facturacion)
         case .configuracion:
