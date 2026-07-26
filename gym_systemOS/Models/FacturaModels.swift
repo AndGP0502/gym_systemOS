@@ -87,35 +87,35 @@ struct ConfiguracionSRI: Codable, FetchableRecord, PersistableRecord, Hashable {
 // MARK: - Factura
 
 struct Factura: Codable, FetchableRecord, MutablePersistableRecord, Identifiable, Hashable {
-    var id: Int64?
-    var claveAcceso: String?
-    var numeroAutorizacion: String?
-    var estado: String?
-    var ambiente: Int?
-    var fechaEmision: String?
-    var fechaAutorizacion: String?
-    var rucEmisor: String?
-    var razonSocialEmisor: String?
-    var tipoIdentificacion: String?
-    var identificacion: String?
-    var razonSocial: String?
-    var correo: String?
-    var telefono: String?
-    var direccion: String?
-    var subtotal0: Double?
-    var subtotal15: Double?
-    var subtotalNoIva: Double?
-    var descuentoTotal: Double?
-    var iva15: Double?
-    var total: Double?
-    var establecimiento: String?
-    var puntoEmision: String?
-    var secuencial: String?
-    var rutaXml: String?
-    var rutaXmlAutorizado: String?
-    var rutaRide: String?
-    var clienteId: Int64?
-    var observacion: String?
+    var id: Int64? = nil
+    var claveAcceso: String? = nil
+    var numeroAutorizacion: String? = nil
+    var estado: String? = nil
+    var ambiente: Int? = nil
+    var fechaEmision: String? = nil
+    var fechaAutorizacion: String? = nil
+    var rucEmisor: String? = nil
+    var razonSocialEmisor: String? = nil
+    var tipoIdentificacion: String? = nil
+    var identificacion: String? = nil
+    var razonSocial: String? = nil
+    var correo: String? = nil
+    var telefono: String? = nil
+    var direccion: String? = nil
+    var subtotal0: Double? = nil
+    var subtotal15: Double? = nil
+    var subtotalNoIva: Double? = nil
+    var descuentoTotal: Double? = nil
+    var iva15: Double? = nil
+    var total: Double? = nil
+    var establecimiento: String? = nil
+    var puntoEmision: String? = nil
+    var secuencial: String? = nil
+    var rutaXml: String? = nil
+    var rutaXmlAutorizado: String? = nil
+    var rutaRide: String? = nil
+    var clienteId: Int64? = nil
+    var observacion: String? = nil
 
     static let databaseTableName = "facturas"
 

@@ -61,9 +61,9 @@ struct RootView: View {
         case .caducados:
             CaducadosView()
         case .facturacion:
-            PlaceholderModuloView(modulo: .facturacion)
+            FacturacionView()
         case .configuracion:
-            PlaceholderModuloView(modulo: .configuracion)
+            ConfiguracionView()
         case .none:
             ContentUnavailableView("Selecciona un módulo",
                                    systemImage: "sidebar.left")
