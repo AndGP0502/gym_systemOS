@@ -1,0 +1,17 @@
+# Xcode / Swift
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+*.moved-aside
+.DS_Store
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# Certificados / secretos — NUNCA se versionan (se cargan en runtime)
+*.p12
+*.pem
+*.key
