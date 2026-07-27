@@ -12,6 +12,7 @@ struct FacturacionView: View {
     @Environment(\.appDatabase) private var db
     @StateObject private var vm = FacturacionViewModel()
     @State private var mostrarNueva = false
+    @State private var compartir: IdentifiableURL?
 
     var body: some View {
         ZStack {
@@ -39,6 +40,16 @@ struct FacturacionView: View {
                                     }.tint(.green)
                                 }
                             }
+                            .swipeActions(edge: .leading) {
+                                Button { compartirRide(f) } label: { Label("RIDE", systemImage: "square.and.arrow.up") }
+                                    .tint(.blue)
+                            }
+                            .contextMenu {
+                                Button { compartirRide(f) } label: { Label("Compartir RIDE (PDF)", systemImage: "doc.richtext") }
+                                if (f.estado ?? "") != "AUTORIZADO", let id = f.id {
+                                    Button { Task { await vm.emitir(facturaId: id) } } label: { Label("Emitir", systemImage: "paperplane") }
+                                }
+                            }
                     }
                 }
             }
@@ -64,11 +75,20 @@ struct FacturacionView: View {
         }
         .task { vm.setup(db: db) }
         .sheet(isPresented: $mostrarNueva) {
-            NuevaFacturaSheet(clientes: vm.clientes) { comprador, lineas in
-                Task { await vm.crearYEmitir(comprador: comprador, lineas: lineas) }
-            }
+            NuevaFacturaSheet(clientes: vm.clientes,
+                onEmitir: { comprador, lineas in Task { await vm.crearYEmitir(comprador: comprador, lineas: lineas) } },
+                onBorrador: { comprador, lineas in vm.guardarBorrador(comprador: comprador, lineas: lineas) })
         }
+        .sheet(item: $compartir) { item in ShareSheet(items: [item.url]) }
         .alert(vm.mensaje ?? "", isPresented: $vm.mostrarMensaje) { Button("OK", role: .cancel) {} }
+    }
+
+    private func compartirRide(_ f: Factura) {
+        guard let data = vm.rideData(f) else { return }
+        let numero = "\(f.establecimiento ?? "001")-\(f.puntoEmision ?? "001")-\(f.secuencial ?? "")"
+        if let url = TempFiles.escribir(data, nombre: "RIDE_\(numero).pdf") {
+            compartir = IdentifiableURL(url: url)
+        }
     }
 }
 
@@ -119,6 +139,7 @@ private extension String {
 private struct NuevaFacturaSheet: View {
     let clientes: [Cliente]
     let onEmitir: (DatosComprador, [LineaFactura]) -> Void
+    let onBorrador: (DatosComprador, [LineaFactura]) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var comprador = DatosComprador()
@@ -194,6 +215,10 @@ private struct NuevaFacturaSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Borrador") { onBorrador(comprador, lineas); dismiss() }
+                        .disabled(comprador.razonSocial.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Emitir") { onEmitir(comprador, lineas); dismiss() }
                         .disabled(comprador.razonSocial.trimmingCharacters(in: .whitespaces).isEmpty)

@@ -9,11 +9,13 @@ import SwiftUI
 
 struct ClientesView: View {
     @Environment(\.appDatabase) private var db
+    @Environment(\.openURL) private var openURL
     @StateObject private var vm = ClientesViewModel()
 
     @State private var editando: Cliente?
     @State private var mostrarFormNuevo = false
     @State private var aEliminar: Cliente?
+    @State private var fichaDe: Cliente?
 
     var body: some View {
         List {
@@ -29,6 +31,17 @@ struct ClientesView: View {
                             Button(role: .destructive) { aEliminar = c } label: {
                                 Label("Eliminar", systemImage: "trash")
                             }
+                        }
+                        .swipeActions(edge: .leading) {
+                            Button { fichaDe = c } label: { Label("Ficha", systemImage: "doc.text.image") }
+                                .tint(.indigo)
+                        }
+                        .contextMenu {
+                            Button { fichaDe = c } label: { Label("Ver ficha", systemImage: "doc.text.image") }
+                            Button { enviarWhatsApp(c) } label: { Label("Recordatorio WhatsApp", systemImage: "message") }
+                            Button { enviarCorreo(c) } label: { Label("Enviar correo", systemImage: "envelope") }
+                            Button { editando = c } label: { Label("Editar", systemImage: "pencil") }
+                            Button(role: .destructive) { aEliminar = c } label: { Label("Eliminar", systemImage: "trash") }
                         }
                 }
             }
@@ -67,6 +80,19 @@ struct ClientesView: View {
         }
         .alert(vm.mensaje ?? "", isPresented: $vm.mostrarMensaje) {
             Button("OK", role: .cancel) {}
+        }
+        .sheet(item: $fichaDe) { c in FichaView(cliente: c) }
+    }
+
+    private func enviarWhatsApp(_ c: Cliente) {
+        let msg = Recordatorios.mensaje(nombre: c.nombre ?? "", diasRestantes: vm.diasRestantes(c))
+        if let url = Recordatorios.whatsappURL(telefono: c.telefono ?? "", mensaje: msg) { openURL(url) }
+    }
+
+    private func enviarCorreo(_ c: Cliente) {
+        let msg = Recordatorios.mensaje(nombre: c.nombre ?? "", diasRestantes: vm.diasRestantes(c))
+        if let url = Recordatorios.correoURL(email: c.correo ?? "", asunto: "Recordatorio de membresía", cuerpo: msg) {
+            openURL(url)
         }
     }
 

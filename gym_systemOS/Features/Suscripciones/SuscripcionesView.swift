@@ -15,6 +15,7 @@ struct SuscripcionesView: View {
     @State private var mostrarNueva = false
     @State private var mostrarPlanes = false
     @State private var renovar: SuscripcionDetalle?
+    @State private var editarFechas: SuscripcionDetalle?
     @State private var aEliminar: SuscripcionDetalle?
 
     var body: some View {
@@ -33,6 +34,11 @@ struct SuscripcionesView: View {
                             Button { renovar = s } label: {
                                 Label("Renovar", systemImage: "arrow.clockwise")
                             }.tint(.blue)
+                        }
+                        .swipeActions(edge: .leading) {
+                            Button { editarFechas = s } label: {
+                                Label("Fechas", systemImage: "calendar")
+                            }.tint(.indigo)
                         }
                 }
             }
@@ -60,6 +66,11 @@ struct SuscripcionesView: View {
         .sheet(item: $renovar) { s in
             RenovarSheet(nombre: s.nombre) { dias, monto in
                 vm.renovar(clienteId: s.clienteId, dias: dias, monto: monto)
+            }
+        }
+        .sheet(item: $editarFechas) { s in
+            EditarFechasSheet(s: s) { inicio, venc in
+                vm.editarFechas(s, inicio: inicio, vencimiento: venc)
             }
         }
         .alert("Eliminar suscripción",
@@ -162,6 +173,44 @@ private struct NuevaSuscripcionSheet: View {
 }
 
 // MARK: - Renovar
+
+private struct EditarFechasSheet: View {
+    let s: SuscripcionDetalle
+    let onGuardar: (String, String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var inicio: Date
+    @State private var vencimiento: Date
+
+    init(s: SuscripcionDetalle, onGuardar: @escaping (String, String) -> Void) {
+        self.s = s
+        self.onGuardar = onGuardar
+        _inicio = State(initialValue: Fechas.parse(s.fechaInicio) ?? Date())
+        _vencimiento = State(initialValue: Fechas.parse(s.fechaVencimiento) ?? Date())
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Fechas de \(s.nombre)") {
+                    DatePicker("Inicio", selection: $inicio, displayedComponents: .date)
+                    DatePicker("Vencimiento", selection: $vencimiento, displayedComponents: .date)
+                }
+            }
+            .navigationTitle("Editar fechas")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Guardar") {
+                        onGuardar(Fechas.iso.string(from: inicio), Fechas.iso.string(from: vencimiento))
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
 
 private struct RenovarSheet: View {
     let nombre: String

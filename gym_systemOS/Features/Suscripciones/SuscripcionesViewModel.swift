@@ -52,6 +52,12 @@ final class SuscripcionesViewModel: ObservableObject {
         susRepo?.eliminar(id: s.id); recargar()
     }
 
+    func editarFechas(_ s: SuscripcionDetalle, inicio: String, vencimiento: String) {
+        guard let susRepo else { return }
+        let r = susRepo.editarFechas(id: s.id, fechaInicio: inicio, fechaVencimiento: vencimiento)
+        notificar(r.mensaje); if r.ok { recargar() }
+    }
+
     // Planes
     func crearPlan(nombre: String, precio: Double, dias: Int) {
         guard let memRepo else { return }

@@ -12,6 +12,20 @@ import Foundation
 struct FacturaService {
     let db: AppDatabase
 
+    // Dependencias inyectables (default = implementación real). Permiten testear
+    // el orquestador (reintento de secuencial + polling) sin red ni certificado.
+    var firmarXML: (String) throws -> String = { xml in
+        let cert = try CertificateStore.loadStored()
+        return try XAdESSigner.firmar(xml: xml, certificado: cert)
+    }
+    var enviar: (String, Int) async -> RecepcionResult = {
+        await SRISoapClient.enviarComprobante(xmlFirmado: $0, ambiente: $1)
+    }
+    var autorizar: (String, Int) async -> AutorizacionResult = {
+        await SRISoapClient.consultarAutorizacion(claveAcceso: $0, ambiente: $1)
+    }
+    var esperar: (Double) async -> Void = { try? await Task.sleep(for: .seconds($0)) }
+
     struct Resultado {
         let ok: Bool
         let estado: String
@@ -30,10 +44,6 @@ struct FacturaService {
         guard let config = configRepo.obtener() else {
             return fail("No hay configuración SRI guardada.")
         }
-        let cert: LoadedCertificate
-        do { cert = try CertificateStore.loadStored() }
-        catch { return fail(error.localizedDescription) }
-
         guard let (facturaBase, detalles) = facturaRepo.cargarFactura(facturaId) else {
             return fail("La factura no existe.")
         }
@@ -56,19 +66,19 @@ struct FacturaService {
 
             // 3. Firmar XAdES-BES.
             let xmlFirmado: String
-            do { xmlFirmado = try XAdESSigner.firmar(xml: gen.xml, certificado: cert) }
+            do { xmlFirmado = try firmarXML(gen.xml) }
             catch { return fail("Error firmando XML: \(error.localizedDescription)") }
 
             // 4. Enviar (recepción).
-            let recepcion = await SRISoapClient.enviarComprobante(xmlFirmado: xmlFirmado, ambiente: ambiente)
+            let recepcion = await enviar(xmlFirmado, ambiente)
 
             // 5. Polling de autorización si fue RECIBIDA.
             var auth = AutorizacionResult(estado: recepcion.estado, numeroAutorizacion: "",
                 fechaAutorizacion: "", xmlAutorizado: "", mensajes: recepcion.mensajes)
             if recepcion.ok {
                 for _ in 0..<8 {
-                    try? await Task.sleep(for: .seconds(4))
-                    auth = await SRISoapClient.consultarAutorizacion(claveAcceso: claveAcceso, ambiente: ambiente)
+                    await esperar(4)
+                    auth = await autorizar(claveAcceso, ambiente)
                     if auth.ok || !Self.estadosPendientes.contains(auth.estado) { break }
                 }
             }
@@ -95,7 +105,7 @@ struct FacturaService {
                 intentoSec += 1
                 let nuevo = configRepo.reservarSiguienteSecuencial()
                 factura.secuencial = String(nuevo)
-                try? await Task.sleep(for: .seconds(1))
+                await esperar(1)
                 continue
             }
 

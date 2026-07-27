@@ -12,6 +12,8 @@ struct PagosView: View {
     @Environment(\.appDatabase) private var db
     @StateObject private var vm = PagosViewModel()
     @State private var pagar: SuscripcionDetalle?
+    @State private var cambiarPlan: SuscripcionDetalle?
+    @State private var crearRapida = false
 
     private let cols = [GridItem(.adaptive(minimum: 160), spacing: 12)]
 
@@ -35,6 +37,13 @@ struct PagosView: View {
                     ForEach(vm.suscripciones) { s in
                         Button { pagar = s } label: { PagoFila(s: s) }
                             .buttonStyle(.plain)
+                            .contextMenu {
+                                Button { pagar = s } label: { Label("Registrar pago", systemImage: "dollarsign.circle") }
+                                Button { cambiarPlan = s } label: { Label("Cambiar plan", systemImage: "arrow.left.arrow.right") }
+                                Button(role: .destructive) { vm.resetearPago(s.id) } label: {
+                                    Label("Resetear pago", systemImage: "arrow.counterclockwise")
+                                }
+                            }
                     }
                 }
             }
@@ -42,11 +51,81 @@ struct PagosView: View {
         .navigationTitle("Pagos")
         .searchable(text: $vm.busqueda, prompt: "Buscar por cédula o nombre")
         .onChange(of: vm.busqueda) { _, _ in vm.recargar() }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { crearRapida = true } label: { Label("Suscripción rápida", systemImage: "plus") }
+            }
+        }
         .task { vm.setup(db: db) }
         .sheet(item: $pagar) { s in
             RegistrarPagoSheet(s: s, vm: vm)
         }
+        .sheet(item: $cambiarPlan) { s in
+            CambiarPlanSheet(s: s, planes: vm.planes) { nuevoId in vm.cambiarPlan(suscripcionId: s.id, nuevoPlanId: nuevoId) }
+        }
+        .sheet(isPresented: $crearRapida) {
+            CrearRapidaSheet(clientes: vm.clientes, planes: vm.planes) { cid, mid in vm.crearRapida(clienteId: cid, membresiaId: mid) }
+        }
         .alert(vm.mensaje ?? "", isPresented: $vm.mostrarMensaje) { Button("OK", role: .cancel) {} }
+    }
+}
+
+private struct CambiarPlanSheet: View {
+    let s: SuscripcionDetalle
+    let planes: [Membresia]
+    let onGuardar: (Int64) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var planId: Int64?
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Suscripción de \(s.nombre)") { LabeledContent("Plan actual", value: s.plan) }
+                Section("Nuevo plan") {
+                    Picker("Plan", selection: $planId) {
+                        Text("Selecciona…").tag(Int64?.none)
+                        ForEach(planes) { p in Text("\(p.nombrePlan ?? "—") · \((p.precio ?? 0).comoMoneda)").tag(Int64?.some(p.id ?? -1)) }
+                    }
+                }
+            }
+            .navigationTitle("Cambiar plan").navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Guardar") { if let id = planId { onGuardar(id); dismiss() } }.disabled(planId == nil)
+                }
+            }
+        }
+    }
+}
+
+private struct CrearRapidaSheet: View {
+    let clientes: [Cliente]
+    let planes: [Membresia]
+    let onCrear: (Int64, Int64) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var clienteId: Int64?
+    @State private var planId: Int64?
+    var body: some View {
+        NavigationStack {
+            Form {
+                Picker("Cliente", selection: $clienteId) {
+                    Text("Selecciona…").tag(Int64?.none)
+                    ForEach(clientes) { c in Text(c.nombre ?? "—").tag(Int64?.some(c.id ?? -1)) }
+                }
+                Picker("Plan", selection: $planId) {
+                    Text("Selecciona…").tag(Int64?.none)
+                    ForEach(planes) { p in Text(p.nombrePlan ?? "—").tag(Int64?.some(p.id ?? -1)) }
+                }
+            }
+            .navigationTitle("Suscripción rápida").navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Crear") { if let c = clienteId, let p = planId { onCrear(c, p); dismiss() } }
+                        .disabled(clienteId == nil || planId == nil)
+                }
+            }
+        }
     }
 }
 

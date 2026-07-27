@@ -3,13 +3,15 @@
 //  gym_systemOS
 //
 //  Navegación principal estilo iPad (NavigationSplitView): barra lateral de
-//  módulos + detalle. Cada módulo se implementa en su fase (ipad_port/RESUMEN.md).
+//  módulos + detalle. Ancho de la barra ajustado para una estética equilibrada.
 //
 
 import SwiftUI
 
 enum Modulo: String, CaseIterable, Identifiable {
+    case inicio        = "Inicio"
     case clientes      = "Clientes"
+    case asistencia    = "Asistencia"
     case suscripciones = "Suscripciones"
     case pagos         = "Pagos"
     case caducados     = "Clientes Caducados"
@@ -20,7 +22,9 @@ enum Modulo: String, CaseIterable, Identifiable {
 
     var icono: String {
         switch self {
+        case .inicio:        return "house.fill"
         case .clientes:      return "person.2.fill"
+        case .asistencia:    return "figure.walk.circle.fill"
         case .suscripciones: return "creditcard.fill"
         case .pagos:         return "dollarsign.circle.fill"
         case .caducados:     return "person.crop.circle.badge.exclamationmark"
@@ -32,54 +36,41 @@ enum Modulo: String, CaseIterable, Identifiable {
 
 struct RootView: View {
     @Environment(\.appDatabase) private var db
-    @State private var seleccion: Modulo? = .clientes
+    @State private var seleccion: Modulo? = .inicio
+    @State private var columnas: NavigationSplitViewVisibility = .all
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnas) {
             List(Modulo.allCases, selection: $seleccion) { modulo in
                 Label(modulo.rawValue, systemImage: modulo.icono)
+                    .font(.body)
+                    .padding(.vertical, 2)
                     .tag(modulo)
             }
             .navigationTitle("Gym System")
             .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: 240, ideal: 275, max: 320)
         } detail: {
             NavigationStack {
                 detalle(for: seleccion)
             }
         }
+        .navigationSplitViewStyle(.balanced)
     }
 
     @ViewBuilder
     private func detalle(for modulo: Modulo?) -> some View {
         switch modulo {
-        case .clientes:
-            ClientesView()
-        case .suscripciones:
-            SuscripcionesView()
-        case .pagos:
-            PagosView()
-        case .caducados:
-            CaducadosView()
-        case .facturacion:
-            FacturacionView()
-        case .configuracion:
-            ConfiguracionView()
+        case .inicio:        DashboardView()
+        case .clientes:      ClientesView()
+        case .asistencia:    AsistenciaView()
+        case .suscripciones: SuscripcionesView()
+        case .pagos:         PagosView()
+        case .caducados:     CaducadosView()
+        case .facturacion:   FacturacionView()
+        case .configuracion: ConfiguracionView()
         case .none:
-            ContentUnavailableView("Selecciona un módulo",
-                                   systemImage: "sidebar.left")
+            ContentUnavailableView("Selecciona un módulo", systemImage: "sidebar.left")
         }
-    }
-}
-
-/// Placeholder temporal para módulos aún no implementados en esta fase.
-struct PlaceholderModuloView: View {
-    let modulo: Modulo
-    var body: some View {
-        ContentUnavailableView {
-            Label(modulo.rawValue, systemImage: modulo.icono)
-        } description: {
-            Text("Módulo en construcción.")
-        }
-        .navigationTitle(modulo.rawValue)
     }
 }

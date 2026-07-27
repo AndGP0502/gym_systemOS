@@ -84,6 +84,50 @@ struct PagosRepo {
         } catch { return false }
     }
 
+    /// Cambia el plan de una suscripción: nuevo precio_total, recalcula el
+    /// vencimiento (inicio + duración del nuevo plan) y el pendiente. (cambiar_plan)
+    func cambiarPlan(suscripcionId: Int64, nuevoPlanId: Int64) -> OperationResult {
+        do {
+            return try db.dbWriter.write { dbc in
+                guard let plan = try Row.fetchOne(dbc,
+                        sql: "SELECT precio, duracion_dias FROM membresias WHERE id = ?", arguments: [nuevoPlanId]) else {
+                    return .fallo("El plan no existe")
+                }
+                guard let sus = try Row.fetchOne(dbc,
+                        sql: "SELECT fecha_inicio, COALESCE(pagado,0) AS pg FROM suscripciones WHERE id = ?",
+                        arguments: [suscripcionId]) else {
+                    return .fallo("La suscripción no existe")
+                }
+                let precio: Double = plan["precio"] ?? 0
+                let dur: Int = plan["duracion_dias"] ?? 0
+                let inicio: String = sus["fecha_inicio"] ?? Fechas.hoyStr()
+                let pagado: Double = sus["pg"]
+                let venc = Fechas.sumarDias(inicio, dur) ?? inicio
+                let pendiente = max(0, precio - pagado)
+                try dbc.execute(sql: """
+                    UPDATE suscripciones SET membresia_id=?, precio_total=?, fecha_vencimiento=?, pendiente=?
+                    WHERE id=?
+                """, arguments: [nuevoPlanId, precio, venc, pendiente, suscripcionId])
+                return .exito("Plan cambiado correctamente")
+            }
+        } catch { return .fallo("Error de base de datos: \(error.localizedDescription)") }
+    }
+
+    /// Resetea el pago de una suscripción: pagado=0, pendiente=precio_total y
+    /// borra el histórico de pagos de esa suscripción. (resetear_pago)
+    @discardableResult
+    func resetearPago(suscripcionId: Int64) -> Bool {
+        do {
+            try db.dbWriter.write { dbc in
+                try dbc.execute(sql: "DELETE FROM pagos WHERE suscripcion_id = ?", arguments: [suscripcionId])
+                try dbc.execute(sql: """
+                    UPDATE suscripciones SET pagado = 0, pendiente = COALESCE(precio_total,0) WHERE id = ?
+                """, arguments: [suscripcionId])
+            }
+            return true
+        } catch { return false }
+    }
+
     /// Totales para las tarjetas resumen del módulo Pagos.
     struct Totales { var total = 0; var pagadas = 0; var pendientes = 0; var recaudado = 0.0 }
 

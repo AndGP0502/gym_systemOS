@@ -24,6 +24,17 @@ final class AppDatabase: Sendable {
     /// Acceso de solo lectura para las vistas / repos.
     var reader: any DatabaseReader { dbWriter }
 
+    /// Copia limpia de la BD a un archivo tembral (VACUUM INTO), para exportar/compartir.
+    func exportarCopia() throws -> URL {
+        let destino = FileManager.default.temporaryDirectory
+            .appendingPathComponent("gym_backup_\(Fechas.hoyStr()).db")
+        try? FileManager.default.removeItem(at: destino)
+        try dbWriter.writeWithoutTransaction { db in
+            try db.execute(sql: "VACUUM INTO ?", arguments: [destino.path])
+        }
+        return destino
+    }
+
     // MARK: - Bootstrap
 
     /// Resultado de abrir la BD en disco. Se evalúa una sola vez al arrancar.
@@ -39,19 +50,21 @@ final class AppDatabase: Sendable {
         try! AppDatabase(DatabaseQueue())
     }
 
-    /// Ruta en disco: Application Support/gym.db (persistente en el dispositivo).
-    private static func makeOnDiskWriter() throws -> DatabaseQueue {
+    /// Ruta en disco de la BD (Application Support/GymSystem/gym.db).
+    static var onDiskURL: URL {
         let fm = FileManager.default
-        let appSupport = try fm.url(for: .applicationSupportDirectory,
-                                    in: .userDomainMask,
-                                    appropriateFor: nil,
-                                    create: true)
+        let appSupport = (try? fm.url(for: .applicationSupportDirectory, in: .userDomainMask,
+                                      appropriateFor: nil, create: true)) ?? URL.temporaryDirectory
         let dir = appSupport.appendingPathComponent("GymSystem", isDirectory: true)
-        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
-        let dbURL = dir.appendingPathComponent("gym.db")
+        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("gym.db")
+    }
+
+    /// Ruta en disco: Application Support/GymSystem/gym.db (persistente).
+    private static func makeOnDiskWriter() throws -> DatabaseQueue {
         var config = Configuration()
         config.foreignKeysEnabled = true
-        return try DatabaseQueue(path: dbURL.path, configuration: config)
+        return try DatabaseQueue(path: onDiskURL.path, configuration: config)
     }
 
     // MARK: - Migraciones (esquema exacto de gym.db)

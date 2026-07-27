@@ -12,6 +12,11 @@ struct ConfiguracionView: View {
     @Environment(\.appDatabase) private var db
     @StateObject private var vm = ConfiguracionViewModel()
     @State private var mostrarPicker = false
+    @State private var pin1 = ""
+    @State private var pin2 = ""
+    @State private var compartirDB: IdentifiableURL?
+    @State private var mostrarImportDB = false
+    @State private var pinConfigurado = AppSettings.pinConfigurado
 
     var body: some View {
         Form {
@@ -54,6 +59,35 @@ struct ConfiguracionView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
+
+            Section("Seguridad (PIN)") {
+                Text(pinConfigurado
+                     ? "Hay un PIN configurado. Protege operaciones destructivas."
+                     : "Sin PIN. Puedes fijar uno para proteger operaciones destructivas.")
+                    .font(.caption).foregroundStyle(.secondary)
+                SecureField("Nuevo PIN", text: $pin1).keyboardType(.numberPad)
+                SecureField("Repetir PIN", text: $pin2).keyboardType(.numberPad)
+                Button(pinConfigurado ? "Cambiar PIN" : "Fijar PIN") {
+                    guard !pin1.isEmpty, pin1 == pin2 else {
+                        vm.mensaje = "Los PIN no coinciden o están vacíos."; vm.mostrarMensaje = true; return
+                    }
+                    AppSettings.setPIN(pin1); pin1 = ""; pin2 = ""; pinConfigurado = true
+                    vm.mensaje = "PIN guardado."; vm.mostrarMensaje = true
+                }
+                if pinConfigurado {
+                    Button("Quitar PIN", role: .destructive) {
+                        AppSettings.borrarPIN(); pinConfigurado = false
+                        vm.mensaje = "PIN eliminado."; vm.mostrarMensaje = true
+                    }
+                }
+            }
+
+            Section("Respaldo de datos") {
+                Button { exportarBD() } label: { Label("Exportar base de datos", systemImage: "square.and.arrow.up") }
+                Button { mostrarImportDB = true } label: { Label("Importar base de datos", systemImage: "square.and.arrow.down") }
+                Text("Exporta/importa el archivo gym.db (mismo esquema que el sistema de escritorio). Tras importar, reinicia la app.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
         .navigationTitle("Configuración")
         .toolbar {
@@ -68,7 +102,41 @@ struct ConfiguracionView: View {
                       allowsMultipleSelection: false) { result in
             manejarImport(result)
         }
+        .sheet(item: $compartirDB) { item in ShareSheet(items: [item.url]) }
+        .fileImporter(isPresented: $mostrarImportDB,
+                      allowedContentTypes: [UTType(filenameExtension: "db") ?? .data, .database],
+                      allowsMultipleSelection: false) { result in importarBD(result) }
         .alert(vm.mensaje ?? "", isPresented: $vm.mostrarMensaje) { Button("OK", role: .cancel) {} }
+    }
+
+    private func exportarBD() {
+        do {
+            let url = try db.exportarCopia()
+            compartirDB = IdentifiableURL(url: url)
+        } catch {
+            vm.mensaje = "No se pudo exportar: \(error.localizedDescription)"; vm.mostrarMensaje = true
+        }
+    }
+
+    private func importarBD(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            let acceso = url.startAccessingSecurityScopedResource()
+            defer { if acceso { url.stopAccessingSecurityScopedResource() } }
+            guard let data = try? Data(contentsOf: url),
+                  data.starts(with: Array("SQLite format 3".utf8)) else {
+                vm.mensaje = "El archivo no es una base de datos SQLite válida."; vm.mostrarMensaje = true; return
+            }
+            do {
+                try data.write(to: AppDatabase.onDiskURL)
+                vm.mensaje = "Base de datos importada. Reinicia la app para cargar los datos."; vm.mostrarMensaje = true
+            } catch {
+                vm.mensaje = "No se pudo importar: \(error.localizedDescription)"; vm.mostrarMensaje = true
+            }
+        case .failure(let error):
+            vm.mensaje = error.localizedDescription; vm.mostrarMensaje = true
+        }
     }
 
     private func campo(_ titulo: String, text: Binding<String>,

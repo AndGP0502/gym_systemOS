@@ -33,6 +33,20 @@ enum Fechas {
     /// Hoy en formato `yyyy-MM-dd` (hora de Ecuador).
     static func hoyStr() -> String { iso.string(from: Date()) }
 
+    private static let horaFmt: DateFormatter = {
+        let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "America/Guayaquil"); f.dateFormat = "HH:mm:ss"; return f
+    }()
+    private static let displayFmt: DateFormatter = {
+        let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "America/Guayaquil"); f.dateFormat = "dd/MM/yyyy"; return f
+    }()
+
+    /// Hora `HH:mm:ss` (Ecuador).
+    static func horaStr(_ date: Date = Date()) -> String { horaFmt.string(from: date) }
+    /// Fecha `dd/MM/yyyy` para mostrar (como en el escritorio).
+    static func displayStr(_ date: Date = Date()) -> String { displayFmt.string(from: date) }
+
     /// Parsea `yyyy-MM-dd`. Devuelve nil si no coincide.
     static func parse(_ s: String?) -> Date? {
         guard let s, !s.isEmpty else { return nil }

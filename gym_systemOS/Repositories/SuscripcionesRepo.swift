@@ -161,6 +161,20 @@ struct SuscripcionesRepo {
         } catch { return .fallo("Error de base de datos: \(error.localizedDescription)") }
     }
 
+    /// Edita las fechas de una suscripción (inicio y/o vencimiento). (editar_fechas)
+    func editarFechas(id: Int64, fechaInicio: String, fechaVencimiento: String) -> OperationResult {
+        guard Fechas.parse(fechaInicio) != nil, Fechas.parse(fechaVencimiento) != nil else {
+            return .fallo("Formato de fecha inválido (use yyyy-MM-dd)")
+        }
+        do {
+            try db.dbWriter.write { dbc in
+                try dbc.execute(sql: "UPDATE suscripciones SET fecha_inicio=?, fecha_vencimiento=? WHERE id=?",
+                                arguments: [fechaInicio, fechaVencimiento, id])
+            }
+            return .exito("Fechas actualizadas correctamente")
+        } catch { return .fallo("Error de base de datos: \(error.localizedDescription)") }
+    }
+
     // MARK: - Eliminar
 
     @discardableResult

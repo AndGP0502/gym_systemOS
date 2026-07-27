@@ -59,16 +59,11 @@ final class FacturacionViewModel: ObservableObject {
         (configRepo?.obtener()) != nil && CertificateStore.hasCertificate()
     }
 
-    /// Ensambla la factura (totales + datos del emisor) y la emite.
-    func crearYEmitir(comprador: DatosComprador, lineas: [LineaFactura]) async {
-        guard let facturaRepo, let db, let config = configRepo?.obtener() else {
-            return notificar("Configura el emisor en Configuración antes de emitir.")
-        }
-        guard puedeEmitir else {
-            return notificar("Configura el emisor y carga el certificado .p12 en Configuración antes de emitir.")
-        }
+    /// Ensambla la factura (totales + datos del emisor) a partir del compositor.
+    private func ensamblar(comprador: DatosComprador, lineas: [LineaFactura]) -> (Factura, [FacturaDetalle])? {
+        guard let config = configRepo?.obtener() else { return nil }
         let validas = lineas.filter { !$0.descripcion.trimmingCharacters(in: .whitespaces).isEmpty && $0.cantidad > 0 }
-        guard !validas.isEmpty else { return notificar("Agrega al menos una línea con descripción y cantidad.") }
+        guard !validas.isEmpty else { return nil }
 
         var detalles: [FacturaDetalle] = []
         var sub0 = 0.0, sub15 = 0.0, iva15 = 0.0
@@ -81,8 +76,6 @@ final class FacturacionViewModel: ObservableObject {
                 tieneIva: l.porcentajeIva > 0 ? 1 : 0, porcentajeIva: l.porcentajeIva,
                 subtotal: subtotal, iva: iva, total: subtotal + iva))
         }
-        let total = sub0 + sub15 + iva15
-
         var factura = Factura()
         factura.fechaEmision = Fechas.hoyStr()
         factura.ambiente = config.ambiente
@@ -101,13 +94,45 @@ final class FacturacionViewModel: ObservableObject {
         factura.subtotal15 = sub15
         factura.iva15 = iva15
         factura.descuentoTotal = 0
-        factura.total = total
+        factura.total = sub0 + sub15 + iva15
+        return (factura, detalles)
+    }
 
-        guard let saved = facturaRepo.guardarFactura(factura, detalles: detalles) else {
+    /// Guarda un borrador sin emitir (guardar_borrador).
+    func guardarBorrador(comprador: DatosComprador, lineas: [LineaFactura]) {
+        guard let facturaRepo, let armado = ensamblar(comprador: comprador, lineas: lineas) else {
+            return notificar("Configura el emisor y agrega al menos una línea válida.")
+        }
+        guard facturaRepo.guardarFactura(armado.0, detalles: armado.1) != nil else {
+            return notificar("No se pudo guardar el borrador.")
+        }
+        recargar()
+        notificar("Borrador guardado.")
+    }
+
+    /// Ensambla la factura y la emite.
+    func crearYEmitir(comprador: DatosComprador, lineas: [LineaFactura]) async {
+        guard let facturaRepo, let db else {
+            return notificar("Configura el emisor en Configuración antes de emitir.")
+        }
+        guard puedeEmitir else {
+            return notificar("Configura el emisor y carga el certificado .p12 en Configuración antes de emitir.")
+        }
+        guard let armado = ensamblar(comprador: comprador, lineas: lineas) else {
+            return notificar("Agrega al menos una línea con descripción y cantidad.")
+        }
+        guard let saved = facturaRepo.guardarFactura(armado.0, detalles: armado.1) else {
             return notificar("No se pudo guardar la factura.")
         }
         recargar()
         await emitir(facturaId: saved.id, db: db)
+    }
+
+    /// Genera el RIDE (PDF) de una factura para compartir/imprimir.
+    func rideData(_ f: Factura) -> Data? {
+        guard let id = f.id, let facturaRepo else { return nil }
+        let dets = facturaRepo.detalles(id)
+        return RidePDF.generar(factura: f, detalles: dets, config: configRepo?.obtener())
     }
 
     /// Config actual (para el compositor: RUC del emisor, etc.).

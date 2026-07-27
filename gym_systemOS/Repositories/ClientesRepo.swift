@@ -78,6 +78,19 @@ struct ClientesRepo {
         }) ?? 0
     }
 
+    /// Días restantes de la suscripción más reciente del cliente (nil si no tiene).
+    /// Port de alertas.dias_restantes.
+    func diasRestantes(clienteId: Int64) -> Int? {
+        let venc = try? db.reader.read { dbc in
+            try String.fetchOne(dbc, sql: """
+                SELECT fecha_vencimiento FROM suscripciones
+                WHERE cliente_id = ? ORDER BY fecha_vencimiento DESC LIMIT 1
+            """, arguments: [clienteId])
+        }
+        guard let venc = venc ?? nil, let f = Fechas.parse(venc) else { return nil }
+        return Fechas.dias(desde: Date(), hasta: f)
+    }
+
     // MARK: - Actualizar
 
     func editar(id: Int64, nombre: String, cedula: String, telefono: String,

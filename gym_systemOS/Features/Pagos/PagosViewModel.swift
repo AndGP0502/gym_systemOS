@@ -12,16 +12,22 @@ final class PagosViewModel: ObservableObject {
     @Published var suscripciones: [SuscripcionDetalle] = []
     @Published var busqueda: String = ""
     @Published var totales = PagosRepo.Totales()
+    @Published var clientes: [Cliente] = []
+    @Published var planes: [Membresia] = []
     @Published var mensaje: String?
     @Published var mostrarMensaje = false
 
     private var pagosRepo: PagosRepo?
     private var susRepo: SuscripcionesRepo?
+    private var memRepo: MembresiasRepo?
+    private var cliRepo: ClientesRepo?
 
     func setup(db: AppDatabase) {
         guard pagosRepo == nil else { return }
         pagosRepo = PagosRepo(db: db)
         susRepo = SuscripcionesRepo(db: db)
+        memRepo = MembresiasRepo(db: db)
+        cliRepo = ClientesRepo(db: db)
         recargar()
     }
 
@@ -29,6 +35,22 @@ final class PagosViewModel: ObservableObject {
         guard let pagosRepo, let susRepo else { return }
         suscripciones = busqueda.isEmpty ? susRepo.verCompletas() : susRepo.buscar(busqueda)
         totales = pagosRepo.totales()
+        planes = memRepo?.ver() ?? []
+        clientes = cliRepo?.ver() ?? []
+    }
+
+    func cambiarPlan(suscripcionId: Int64, nuevoPlanId: Int64) {
+        let r = pagosRepo?.cambiarPlan(suscripcionId: suscripcionId, nuevoPlanId: nuevoPlanId)
+        notificar(r?.mensaje ?? ""); recargar()
+    }
+
+    func resetearPago(_ suscripcionId: Int64) {
+        pagosRepo?.resetearPago(suscripcionId: suscripcionId); recargar()
+    }
+
+    func crearRapida(clienteId: Int64, membresiaId: Int64) {
+        let r = susRepo?.crear(clienteId: clienteId, membresiaId: membresiaId)
+        notificar(r?.mensaje ?? ""); recargar()
     }
 
     func registrar(suscripcionId: Int64, monto: Double) {

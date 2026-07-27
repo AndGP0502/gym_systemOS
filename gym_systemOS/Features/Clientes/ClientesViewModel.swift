@@ -50,6 +50,11 @@ final class ClientesViewModel: ObservableObject {
         recargar()
     }
 
+    func diasRestantes(_ c: Cliente) -> Int? {
+        guard let repo, let id = c.id else { return nil }
+        return repo.diasRestantes(clienteId: id)
+    }
+
     private func notificar(_ m: String) {
         mensaje = m
         mostrarMensaje = true
