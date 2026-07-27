@@ -103,12 +103,12 @@ Leyenda: ✅ portada · 🟦 adaptada (equivalente iOS) · ⛔ excluida (con mot
 
 ## Exclusiones — qué se dejó fuera y por qué
 
-1. **Import/Export a Excel** (`importar_plantilla`, `importar_fivgym`, `exportar_backup_excel`,
-   `importar_desde_excel`). **Motivo**: dependen de formatos `.xlsx` propios del escritorio y de
-   `openpyxl`, poco naturales en iPad. **Sustituto implementado**: *Exportar / Importar base de
-   datos* (`gym.db`) en Configuración — el esquema del port es **idéntico** al del `.exe`, así que
-   copiar el `gym.db` migra los datos **sin pérdida** y sin conversión. (Si más adelante se
-   requiere Excel específicamente, se puede añadir con un parser CSV/xlsx.)
+1. **Import Excel** (`importar_plantilla`, `importar_fivgym`). **Motivo**: dependen de formatos
+   `.xlsx` propios del escritorio y de `openpyxl`. **Sustituto**: *Importar base de datos* (`gym.db`,
+   mismo esquema → migración sin pérdida).
+   **Export a Excel: IMPLEMENTADO** — botón **Exportar a Excel (CSV)** en Configuración y botón
+   **Exportar** (share) en Clientes/Suscripciones/Pagos que exporta la lista *filtrada* a CSV
+   (abre en Excel/Numbers, con BOM UTF-8 para acentos).
 
 2. **PDF de reporte mensual** (`generar_pdf_reporte_mensual`). **Motivo**: reporte interno; el
    RIDE (factura) y el **PDF de ficha del cliente** ya están implementados con PDFKit. Se añade con
@@ -129,8 +129,9 @@ Leyenda: ✅ portada · 🟦 adaptada (equivalente iOS) · ⛔ excluida (con mot
    *Importar base de datos* (para reemplazar todo de forma controlada). Además quedó implementado
    el **PIN** (`AppSettings`) para proteger estas acciones si se decide exponerlas.
 
-6. **Filtro por mes dentro de Pagos** (`on_mes_change`) y el **reloj en vivo** de Asistencia.
-   **Motivo**: menores/cosméticos. El filtrado por mes/año ya existe en **Clientes Caducados**, y
-   Pagos tiene búsqueda por cédula/nombre.
+6. **Reloj en vivo** de Asistencia. **Motivo**: cosmético.
+   *(El `on_mes_change` de Pagos quedó superado: Clientes, Suscripciones y Pagos tienen ahora
+   **filtros por condición** — Activas/Vencidas/Por vencer/Pagadas/Por pagar/Deuda — además de
+   búsqueda y los filtros mes/año de Caducados.)*
 
 Todo lo demás del `.exe` está portado (✅) o adaptado a su equivalente iOS (🟦).

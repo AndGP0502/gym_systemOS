@@ -135,6 +135,39 @@ final class ModulosTests: XCTestCase {
         XCTAssertEqual(pag.historial(suscripcionId: sid).first?.monto, 25)
     }
 
+    func testEditarMontosSuscripcion() throws {
+        let db = nuevaDB()
+        let (cid, mid) = clienteYPlan(db, dur: 30, precio: 30)
+        let sus = SuscripcionesRepo(db: db)
+        _ = sus.asignar(clienteId: cid, membresiaId: mid, precioTotal: 30, pagado: 10)
+        let sid = sus.verCompletas().first!.id
+        // Edición directa: precio 50, pagado 20 → pendiente 30
+        XCTAssertTrue(sus.editarMontos(id: sid, precioTotal: 50, pagado: 20).ok)
+        let d = sus.verCompletas().first!
+        XCTAssertEqual(d.precioTotal, 50, accuracy: 0.001)
+        XCTAssertEqual(d.pagado, 20, accuracy: 0.001)
+        XCTAssertEqual(d.pendiente, 30, accuracy: 0.001)
+    }
+
+    func testResumenClientes() throws {
+        let db = nuevaDB()
+        let cli = ClientesRepo(db: db); let mem = MembresiasRepo(db: db); let sus = SuscripcionesRepo(db: db)
+        _ = cli.agregar(nombre: "Activo", cedula: "1", telefono: "1")
+        _ = cli.agregar(nombre: "Vencido", cedula: "2", telefono: "2")
+        _ = cli.agregar(nombre: "SinSub", cedula: "3", telefono: "3")
+        _ = mem.crear(nombrePlan: "M", precio: 30, duracionDias: 30)
+        let mid = mem.ver().first!.id!
+        let ids = cli.ver().map { $0.id! }
+        _ = sus.asignar(clienteId: ids[0], membresiaId: mid, precioTotal: 30, pagado: 30) // activo
+        _ = sus.asignar(clienteId: ids[1], membresiaId: mid, precioTotal: 30, pagado: 0,
+                        fechaInicio: Fechas.sumarDias(Fechas.hoyStr(), -60)) // vencido + deuda
+        let r = cli.resumen()
+        XCTAssertEqual(r.total, 3)
+        XCTAssertEqual(r.activos, 1)
+        XCTAssertEqual(r.vencidos, 1)
+        XCTAssertEqual(r.conDeuda, 1)
+    }
+
     // MARK: - Orquestador de facturación (mock SOAP)
 
     private func prepararFactura(_ db: AppDatabase, siguienteSecuencial: Int = 1) -> Int64 {

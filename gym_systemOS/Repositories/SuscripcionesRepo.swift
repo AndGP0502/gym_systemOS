@@ -175,6 +175,21 @@ struct SuscripcionesRepo {
         } catch { return .fallo("Error de base de datos: \(error.localizedDescription)") }
     }
 
+    /// Edita directamente los montos de una suscripción: precio total y pagado.
+    /// El pendiente se recalcula = max(0, precio_total - pagado).
+    func editarMontos(id: Int64, precioTotal: Double, pagado: Double) -> OperationResult {
+        if precioTotal < 0 || pagado < 0 { return .fallo("Los montos no pueden ser negativos") }
+        let pendiente = max(0, precioTotal - pagado)
+        do {
+            try db.dbWriter.write { dbc in
+                try dbc.execute(sql: """
+                    UPDATE suscripciones SET precio_total=?, pagado=?, pendiente=? WHERE id=?
+                """, arguments: [precioTotal, pagado, pendiente, id])
+            }
+            return .exito("Montos actualizados correctamente")
+        } catch { return .fallo("Error de base de datos: \(error.localizedDescription)") }
+    }
+
     // MARK: - Eliminar
 
     @discardableResult

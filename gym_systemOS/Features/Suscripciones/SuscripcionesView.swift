@@ -16,7 +16,9 @@ struct SuscripcionesView: View {
     @State private var mostrarPlanes = false
     @State private var renovar: SuscripcionDetalle?
     @State private var editar: SuscripcionDetalle?
+    @State private var editarMontos: SuscripcionDetalle?
     @State private var aEliminar: SuscripcionDetalle?
+    @State private var compartir: IdentifiableURL?
 
     var body: some View {
         List {
@@ -30,6 +32,7 @@ struct SuscripcionesView: View {
                         SuscripcionFila(s: s)
                         Menu {
                             Button { editar = s } label: { Label("Editar (plan y fechas)", systemImage: "pencil") }
+                            Button { editarMontos = s } label: { Label("Editar montos ($)", systemImage: "dollarsign.circle") }
                             Button { renovar = s } label: { Label("Renovar", systemImage: "arrow.clockwise") }
                             Button(role: .destructive) { aEliminar = s } label: { Label("Eliminar", systemImage: "trash") }
                         } label: {
@@ -51,11 +54,22 @@ struct SuscripcionesView: View {
         .searchable(text: $vm.busqueda, prompt: "Buscar por cédula o nombre")
         .onChange(of: vm.busqueda) { _, _ in vm.recargar() }
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Menu {
+                    Picker("Filtro", selection: $vm.filtro) {
+                        ForEach(FiltroSuscripcion.allCases) { f in Label(f.rawValue, systemImage: f.icono).tag(f) }
+                    }
+                } label: {
+                    Label(vm.filtro == .todas ? "Filtrar" : vm.filtro.rawValue,
+                          systemImage: "line.3.horizontal.decrease.circle")
+                }
+                .onChange(of: vm.filtro) { _, _ in vm.aplicarFiltro() }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { exportar() } label: { Label("Exportar", systemImage: "square.and.arrow.up") }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { mostrarNueva = true } label: { Label("Nueva", systemImage: "plus") }
-            }
-            ToolbarItem(placement: .topBarLeading) {
-                Button { mostrarPlanes = true } label: { Label("Planes", systemImage: "list.bullet.rectangle") }
             }
         }
         .task { vm.setup(db: db) }
@@ -77,12 +91,22 @@ struct SuscripcionesView: View {
                 vm.editarSuscripcion(s, nuevoPlanId: planId, inicio: inicio, vencimiento: venc)
             }
         }
+        .sheet(item: $editarMontos) { s in
+            EditarMontosSheet(titulo: "Suscripción de \(s.nombre)", precioTotal: s.precioTotal, pagado: s.pagado) { precio, pagado in
+                vm.editarMontos(s, precioTotal: precio, pagado: pagado)
+            }
+        }
+        .sheet(item: $compartir) { item in ShareSheet(items: [item.url]) }
         .alert("Eliminar suscripción",
                isPresented: Binding(get: { aEliminar != nil }, set: { if !$0 { aEliminar = nil } })) {
             Button("Eliminar", role: .destructive) { if let s = aEliminar { vm.eliminar(s) }; aEliminar = nil }
             Button("Cancelar", role: .cancel) { aEliminar = nil }
         } message: { Text("¿Eliminar la suscripción de \(aEliminar?.nombre ?? "")?") }
         .alert(vm.mensaje ?? "", isPresented: $vm.mostrarMensaje) { Button("OK", role: .cancel) {} }
+    }
+
+    private func exportar() {
+        if let url = CSVExport.archivo(vm.csv(), nombre: "suscripciones.csv") { compartir = IdentifiableURL(url: url) }
     }
 }
 

@@ -11,10 +11,13 @@ import Combine
 final class SuscripcionesViewModel: ObservableObject {
     @Published var suscripciones: [SuscripcionDetalle] = []
     @Published var busqueda: String = ""
+    @Published var filtro: FiltroSuscripcion = .todas
     @Published var clientes: [Cliente] = []
     @Published var planes: [Membresia] = []
     @Published var mensaje: String?
     @Published var mostrarMensaje = false
+
+    private var base: [SuscripcionDetalle] = []
 
     private var susRepo: SuscripcionesRepo?
     private var memRepo: MembresiasRepo?
@@ -32,10 +35,21 @@ final class SuscripcionesViewModel: ObservableObject {
 
     func recargar() {
         guard let susRepo, let memRepo, let cliRepo else { return }
-        suscripciones = busqueda.isEmpty ? susRepo.verCompletas() : susRepo.buscar(busqueda)
+        base = busqueda.isEmpty ? susRepo.verCompletas() : susRepo.buscar(busqueda)
+        aplicarFiltro()
         planes = memRepo.ver()
         clientes = cliRepo.ver()
     }
+
+    func aplicarFiltro() { suscripciones = base.filter { filtro.incluye($0) } }
+
+    func editarMontos(_ s: SuscripcionDetalle, precioTotal: Double, pagado: Double) {
+        let r = susRepo?.editarMontos(id: s.id, precioTotal: precioTotal, pagado: pagado)
+        notificar(r?.mensaje ?? ""); recargar()
+    }
+
+    /// CSV de las suscripciones mostradas (con filtro/búsqueda aplicados).
+    func csv() -> String { CSVExport.suscripciones(suscripciones) }
 
     func asignar(clienteId: Int64, membresiaId: Int64, pagado: Double) {
         guard let susRepo, let plan = planes.first(where: { $0.id == membresiaId }) else { return }

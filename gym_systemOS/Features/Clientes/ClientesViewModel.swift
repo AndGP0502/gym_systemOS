@@ -11,11 +11,14 @@ import Combine
 final class ClientesViewModel: ObservableObject {
     @Published var clientes: [Cliente] = []
     @Published var busqueda: String = ""
+    @Published var filtro: FiltroCliente = .todos
+    @Published var resumen = ClientesRepo.ResumenClientes()
     @Published var mensaje: String?
     @Published var mostrarMensaje = false
 
     private var repo: ClientesRepo?
     private var fichaRepo: FichaRepo?
+    private var estadosCache = ClientesRepo.EstadosClientes()
 
     func setup(db: AppDatabase) {
         guard repo == nil else { return }
@@ -35,8 +38,25 @@ final class ClientesViewModel: ObservableObject {
 
     func recargar() {
         guard let repo else { return }
-        clientes = busqueda.isEmpty ? repo.ver() : repo.buscar(busqueda)
+        estadosCache = repo.estados()
+        resumen = ClientesRepo.ResumenClientes(total: repo.contar(),
+            activos: estadosCache.activos.count, vencidos: estadosCache.vencidos.count,
+            conDeuda: estadosCache.conDeuda.count)
+        let base = busqueda.isEmpty ? repo.ver() : repo.buscar(busqueda)
+        clientes = aplicarFiltro(base)
     }
+
+    private func aplicarFiltro(_ base: [Cliente]) -> [Cliente] {
+        switch filtro {
+        case .todos:    return base
+        case .activos:  return base.filter { $0.id.map(estadosCache.activos.contains) ?? false }
+        case .vencidos: return base.filter { $0.id.map(estadosCache.vencidos.contains) ?? false }
+        case .conDeuda: return base.filter { $0.id.map(estadosCache.conDeuda.contains) ?? false }
+        }
+    }
+
+    /// CSV de los clientes actualmente mostrados (con filtro/búsqueda aplicados).
+    func csv() -> String { CSVExport.clientes(clientes) }
 
     func agregar(nombre: String, cedula: String, telefono: String, correo: String) -> Bool {
         guard let repo else { return false }

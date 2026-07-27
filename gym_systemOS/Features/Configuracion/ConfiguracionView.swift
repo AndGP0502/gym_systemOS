@@ -17,6 +17,8 @@ struct ConfiguracionView: View {
     @State private var compartirDB: IdentifiableURL?
     @State private var mostrarImportDB = false
     @State private var pinConfigurado = AppSettings.pinConfigurado
+    @State private var csvURLs: [URL] = []
+    @State private var mostrarCSVShare = false
 
     var body: some View {
         Form {
@@ -83,9 +85,10 @@ struct ConfiguracionView: View {
             }
 
             Section("Respaldo de datos") {
-                Button { exportarBD() } label: { Label("Exportar base de datos", systemImage: "square.and.arrow.up") }
+                Button { exportarBD() } label: { Label("Exportar base de datos (.db)", systemImage: "square.and.arrow.up") }
+                Button { exportarCSV() } label: { Label("Exportar a Excel (CSV)", systemImage: "tablecells") }
                 Button { mostrarImportDB = true } label: { Label("Importar base de datos", systemImage: "square.and.arrow.down") }
-                Text("Exporta/importa el archivo gym.db (mismo esquema que el sistema de escritorio). Tras importar, reinicia la app.")
+                Text("‘Excel (CSV)’ genera clientes.csv y suscripciones.csv (se abren en Excel/Numbers). La base .db conserva todo con el mismo esquema del escritorio. Tras importar, reinicia la app.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -103,6 +106,7 @@ struct ConfiguracionView: View {
             manejarImport(result)
         }
         .sheet(item: $compartirDB) { item in ShareSheet(items: [item.url]) }
+        .sheet(isPresented: $mostrarCSVShare) { ShareSheet(items: csvURLs) }
         .fileImporter(isPresented: $mostrarImportDB,
                       allowedContentTypes: [UTType(filenameExtension: "db") ?? .data, .database],
                       allowsMultipleSelection: false) { result in importarBD(result) }
@@ -116,6 +120,16 @@ struct ConfiguracionView: View {
         } catch {
             vm.mensaje = "No se pudo exportar: \(error.localizedDescription)"; vm.mostrarMensaje = true
         }
+    }
+
+    private func exportarCSV() {
+        let cli = CSVExport.clientes(ClientesRepo(db: db).ver())
+        let sus = CSVExport.suscripciones(SuscripcionesRepo(db: db).verCompletas())
+        var urls: [URL] = []
+        if let u = CSVExport.archivo(cli, nombre: "clientes.csv") { urls.append(u) }
+        if let u = CSVExport.archivo(sus, nombre: "suscripciones.csv") { urls.append(u) }
+        csvURLs = urls
+        mostrarCSVShare = !urls.isEmpty
     }
 
     private func importarBD(_ result: Result<[URL], Error>) {

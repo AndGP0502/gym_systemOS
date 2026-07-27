@@ -78,6 +78,35 @@ struct ClientesRepo {
         }) ?? 0
     }
 
+    struct ResumenClientes { var total = 0; var activos = 0; var vencidos = 0; var conDeuda = 0 }
+
+    /// Conjuntos de IDs de cliente por estado de suscripción (para tarjetas y filtros).
+    struct EstadosClientes {
+        var activos: Set<Int64> = []   // con suscripción vigente
+        var conSub: Set<Int64> = []    // con alguna suscripción
+        var conDeuda: Set<Int64> = []  // con pendiente > 0
+        var vencidos: Set<Int64> { conSub.subtracting(activos) }
+    }
+
+    func estados() -> EstadosClientes {
+        (try? db.reader.read { dbc -> EstadosClientes in
+            let hoy = Fechas.hoyStr()
+            var e = EstadosClientes()
+            e.activos = try Int64.fetchSet(dbc,
+                sql: "SELECT DISTINCT cliente_id FROM suscripciones WHERE fecha_vencimiento >= ?", arguments: [hoy])
+            e.conSub = try Int64.fetchSet(dbc, sql: "SELECT DISTINCT cliente_id FROM suscripciones")
+            e.conDeuda = try Int64.fetchSet(dbc,
+                sql: "SELECT DISTINCT cliente_id FROM suscripciones WHERE COALESCE(pendiente,0) > 0")
+            return e
+        }) ?? EstadosClientes()
+    }
+
+    func resumen() -> ResumenClientes {
+        let e = estados()
+        return ResumenClientes(total: contar(), activos: e.activos.count,
+                               vencidos: e.vencidos.count, conDeuda: e.conDeuda.count)
+    }
+
     /// Días restantes de la suscripción más reciente del cliente (nil si no tiene).
     /// Port de alertas.dias_restantes.
     func diasRestantes(clienteId: Int64) -> Int? {

@@ -18,12 +18,24 @@ struct ClientesView: View {
     @State private var fichaDe: Cliente?
     @State private var compartir: IdentifiableURL?
 
+    private let cols = [GridItem(.adaptive(minimum: 150), spacing: 10)]
+
     var body: some View {
         List {
+            Section {
+                LazyVGrid(columns: cols, spacing: 10) {
+                    IndicadorCard(titulo: "Total", valor: "\(vm.resumen.total)", color: Color(hex: "3b5f86"), icono: "person.3.fill")
+                    IndicadorCard(titulo: "Activos", valor: "\(vm.resumen.activos)", color: Color(hex: "13c29a"), icono: "checkmark.seal.fill")
+                    IndicadorCard(titulo: "Vencidos", valor: "\(vm.resumen.vencidos)", color: Color(hex: "d64545"), icono: "xmark.seal.fill")
+                    IndicadorCard(titulo: "Con deuda", valor: "\(vm.resumen.conDeuda)", color: Color(hex: "e08a1e"), icono: "exclamationmark.triangle.fill")
+                }
+                .listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
+            }
+
             if vm.clientes.isEmpty {
                 ContentUnavailableView("Sin clientes",
                     systemImage: "person.2",
-                    description: Text("Agrega tu primer cliente con el botón +."))
+                    description: Text("No hay clientes para el filtro actual."))
             } else {
                 ForEach(vm.clientes) { c in
                     fila(c)
@@ -41,10 +53,22 @@ struct ClientesView: View {
         .searchable(text: $vm.busqueda, prompt: "Buscar por cédula o nombre")
         .onChange(of: vm.busqueda) { _, _ in vm.recargar() }
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { mostrarFormNuevo = true } label: {
-                    Label("Nuevo cliente", systemImage: "plus")
+            ToolbarItem(placement: .topBarLeading) {
+                Menu {
+                    Picker("Filtro", selection: $vm.filtro) {
+                        ForEach(FiltroCliente.allCases) { f in Label(f.rawValue, systemImage: f.icono).tag(f) }
+                    }
+                } label: {
+                    Label(vm.filtro == .todos ? "Filtrar" : vm.filtro.rawValue,
+                          systemImage: "line.3.horizontal.decrease.circle")
                 }
+                .onChange(of: vm.filtro) { _, _ in vm.recargar() }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { exportar() } label: { Label("Exportar", systemImage: "square.and.arrow.up") }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { mostrarFormNuevo = true } label: { Label("Nuevo cliente", systemImage: "plus") }
             }
         }
         .task { vm.setup(db: db) }
@@ -92,6 +116,10 @@ struct ClientesView: View {
         guard let data = vm.fichaPDF(c) else { return }
         let nombre = "Cliente_\((c.nombre ?? "cliente").replacingOccurrences(of: " ", with: "_")).pdf"
         if let url = TempFiles.escribir(data, nombre: nombre) { compartir = IdentifiableURL(url: url) }
+    }
+
+    private func exportar() {
+        if let url = CSVExport.archivo(vm.csv(), nombre: "clientes.csv") { compartir = IdentifiableURL(url: url) }
     }
 
     private func fila(_ c: Cliente) -> some View {

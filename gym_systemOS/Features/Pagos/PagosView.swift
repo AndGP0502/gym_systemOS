@@ -14,6 +14,7 @@ struct PagosView: View {
     @State private var pagar: SuscripcionDetalle?
     @State private var cambiarPlan: SuscripcionDetalle?
     @State private var crearRapida = false
+    @State private var compartir: IdentifiableURL?
 
     private let cols = [GridItem(.adaptive(minimum: 160), spacing: 12)]
 
@@ -52,6 +53,20 @@ struct PagosView: View {
         .searchable(text: $vm.busqueda, prompt: "Buscar por cédula o nombre")
         .onChange(of: vm.busqueda) { _, _ in vm.recargar() }
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Menu {
+                    Picker("Filtro", selection: $vm.filtro) {
+                        ForEach(FiltroSuscripcion.allCases) { f in Label(f.rawValue, systemImage: f.icono).tag(f) }
+                    }
+                } label: {
+                    Label(vm.filtro == .todas ? "Filtrar" : vm.filtro.rawValue,
+                          systemImage: "line.3.horizontal.decrease.circle")
+                }
+                .onChange(of: vm.filtro) { _, _ in vm.aplicarFiltro() }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { exportar() } label: { Label("Exportar", systemImage: "square.and.arrow.up") }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { crearRapida = true } label: { Label("Suscripción rápida", systemImage: "plus") }
             }
@@ -66,7 +81,12 @@ struct PagosView: View {
         .sheet(isPresented: $crearRapida) {
             CrearRapidaSheet(clientes: vm.clientes, planes: vm.planes) { cid, mid in vm.crearRapida(clienteId: cid, membresiaId: mid) }
         }
+        .sheet(item: $compartir) { item in ShareSheet(items: [item.url]) }
         .alert(vm.mensaje ?? "", isPresented: $vm.mostrarMensaje) { Button("OK", role: .cancel) {} }
+    }
+
+    private func exportar() {
+        if let url = CSVExport.archivo(vm.csv(), nombre: "pagos.csv") { compartir = IdentifiableURL(url: url) }
     }
 }
 
@@ -175,6 +195,7 @@ private struct RegistrarPagoSheet: View {
     @State private var historial: [Pago] = []
     @State private var editandoPago: Pago?
     @State private var montoEdit = ""
+    @State private var mostrarMontos = false
 
     var body: some View {
         NavigationStack {
@@ -185,6 +206,10 @@ private struct RegistrarPagoSheet: View {
                     LabeledContent("Precio", value: s.precioTotal.comoMoneda)
                     LabeledContent("Pagado", value: s.pagado.comoMoneda)
                     LabeledContent("Pendiente", value: s.pendiente.comoMoneda)
+                        .foregroundStyle(s.pendiente > 0 ? .red : .green)
+                    Button { mostrarMontos = true } label: {
+                        Label("Editar montos (precio / pagado)", systemImage: "dollarsign.circle")
+                    }
                 }
                 Section("Registrar pago") {
                     TextField("Monto", text: $montoText).keyboardType(.decimalPad)
@@ -236,6 +261,12 @@ private struct RegistrarPagoSheet: View {
                 }
                 Button("Cancelar", role: .cancel) { editandoPago = nil }
             } message: { Text("Ajusta el monto de este pago. La suscripción se recalcula automáticamente.") }
+            .sheet(isPresented: $mostrarMontos) {
+                EditarMontosSheet(titulo: "Suscripción de \(s.nombre)", precioTotal: s.precioTotal, pagado: s.pagado) { precio, pagado in
+                    vm.editarMontos(s.id, precioTotal: precio, pagado: pagado)
+                    dismiss()
+                }
+            }
         }
     }
 }

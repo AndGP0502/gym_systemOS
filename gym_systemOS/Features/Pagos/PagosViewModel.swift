@@ -11,11 +11,14 @@ import Combine
 final class PagosViewModel: ObservableObject {
     @Published var suscripciones: [SuscripcionDetalle] = []
     @Published var busqueda: String = ""
+    @Published var filtro: FiltroSuscripcion = .todas
     @Published var totales = PagosRepo.Totales()
     @Published var clientes: [Cliente] = []
     @Published var planes: [Membresia] = []
     @Published var mensaje: String?
     @Published var mostrarMensaje = false
+
+    private var base: [SuscripcionDetalle] = []
 
     private var pagosRepo: PagosRepo?
     private var susRepo: SuscripcionesRepo?
@@ -33,11 +36,22 @@ final class PagosViewModel: ObservableObject {
 
     func recargar() {
         guard let pagosRepo, let susRepo else { return }
-        suscripciones = busqueda.isEmpty ? susRepo.verCompletas() : susRepo.buscar(busqueda)
+        base = busqueda.isEmpty ? susRepo.verCompletas() : susRepo.buscar(busqueda)
+        aplicarFiltro()
         totales = pagosRepo.totales()
         planes = memRepo?.ver() ?? []
         clientes = cliRepo?.ver() ?? []
     }
+
+    func aplicarFiltro() { suscripciones = base.filter { filtro.incluye($0) } }
+
+    func editarMontos(_ suscripcionId: Int64, precioTotal: Double, pagado: Double) {
+        let r = susRepo?.editarMontos(id: suscripcionId, precioTotal: precioTotal, pagado: pagado)
+        notificar(r?.mensaje ?? ""); recargar()
+    }
+
+    /// CSV de las suscripciones/pagos mostrados.
+    func csv() -> String { CSVExport.suscripciones(suscripciones) }
 
     func cambiarPlan(suscripcionId: Int64, nuevoPlanId: Int64) {
         let r = pagosRepo?.cambiarPlan(suscripcionId: suscripcionId, nuevoPlanId: nuevoPlanId)
