@@ -16,8 +16,12 @@ import Security
 final class gym_systemOSTests: XCTestCase {
 
     private func loadCert() throws -> LoadedCertificate {
-        let url = try XCTUnwrap(Bundle(for: type(of: self)).url(forResource: "test_cert", withExtension: "p12"),
-                                "Falta test_cert.p12 en el bundle de pruebas")
+        // test_cert.p12 es un certificado de PRUEBA local, excluido del repositorio.
+        // Si no está en el bundle (p. ej. tras clonar), estas pruebas se OMITEN.
+        guard let url = Bundle(for: type(of: self)).url(forResource: "test_cert", withExtension: "p12") else {
+            throw XCTSkip("test_cert.p12 no está presente (excluido del repo). "
+                          + "Coloca un .p12 de prueba local para ejecutar las pruebas de firma.")
+        }
         let data = try Data(contentsOf: url)
         return try CertificateStore.load(p12: data, password: "test123")
     }
