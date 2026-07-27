@@ -16,6 +16,7 @@ struct ClientesView: View {
     @State private var mostrarFormNuevo = false
     @State private var aEliminar: Cliente?
     @State private var fichaDe: Cliente?
+    @State private var compartir: IdentifiableURL?
 
     var body: some View {
         List {
@@ -25,23 +26,13 @@ struct ClientesView: View {
                     description: Text("Agrega tu primer cliente con el botón +."))
             } else {
                 ForEach(vm.clientes) { c in
-                    Button { editando = c } label: { fila(c) }
-                        .buttonStyle(.plain)
+                    fila(c)
                         .swipeActions(edge: .trailing) {
                             Button(role: .destructive) { aEliminar = c } label: {
                                 Label("Eliminar", systemImage: "trash")
                             }
-                        }
-                        .swipeActions(edge: .leading) {
-                            Button { fichaDe = c } label: { Label("Ficha", systemImage: "doc.text.image") }
-                                .tint(.indigo)
-                        }
-                        .contextMenu {
-                            Button { fichaDe = c } label: { Label("Ver ficha", systemImage: "doc.text.image") }
-                            Button { enviarWhatsApp(c) } label: { Label("Recordatorio WhatsApp", systemImage: "message") }
-                            Button { enviarCorreo(c) } label: { Label("Enviar correo", systemImage: "envelope") }
-                            Button { editando = c } label: { Label("Editar", systemImage: "pencil") }
-                            Button(role: .destructive) { aEliminar = c } label: { Label("Eliminar", systemImage: "trash") }
+                            Button { enviarCorreo(c) } label: { Label("Correo", systemImage: "envelope") }
+                                .tint(.teal)
                         }
                 }
             }
@@ -82,6 +73,7 @@ struct ClientesView: View {
             Button("OK", role: .cancel) {}
         }
         .sheet(item: $fichaDe) { c in FichaView(cliente: c) }
+        .sheet(item: $compartir) { item in ShareSheet(items: [item.url]) }
     }
 
     private func enviarWhatsApp(_ c: Cliente) {
@@ -96,25 +88,47 @@ struct ClientesView: View {
         }
     }
 
+    private func generarPDF(_ c: Cliente) {
+        guard let data = vm.fichaPDF(c) else { return }
+        let nombre = "Cliente_\((c.nombre ?? "cliente").replacingOccurrences(of: " ", with: "_")).pdf"
+        if let url = TempFiles.escribir(data, nombre: nombre) { compartir = IdentifiableURL(url: url) }
+    }
+
     private func fila(_ c: Cliente) -> some View {
-        HStack(spacing: 14) {
-            Image(systemName: "person.circle.fill")
-                .font(.title)
-                .foregroundStyle(.tint)
+        HStack(spacing: 12) {
+            Image(systemName: "person.circle.fill").font(.title).foregroundStyle(.tint)
             VStack(alignment: .leading, spacing: 2) {
                 Text(c.nombre ?? "—").font(.headline)
                 HStack(spacing: 10) {
                     Label(c.cedula ?? "—", systemImage: "number")
                     Label(c.telefono ?? "—", systemImage: "phone")
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+            // Acciones visibles por cliente
+            HStack(spacing: 6) {
+                accion("Ficha", "doc.text.image", .indigo) { fichaDe = c }
+                accion("WhatsApp", "message.fill", .green) { enviarWhatsApp(c) }
+                accion("PDF", "arrow.down.doc.fill", .red) { generarPDF(c) }
+                accion("Editar", "pencil", .blue) { editando = c }
+            }
         }
         .padding(.vertical, 4)
-        .contentShape(Rectangle())
+    }
+
+    private func accion(_ titulo: String, _ icono: String, _ color: Color,
+                        _ accion: @escaping () -> Void) -> some View {
+        Button(action: accion) {
+            VStack(spacing: 2) {
+                Image(systemName: icono).font(.title3)
+                Text(titulo).font(.caption2)
+            }
+            .frame(width: 58, height: 44)
+            .foregroundStyle(color)
+            .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.borderless)
     }
 }
 
@@ -147,14 +161,14 @@ private struct ClienteFormView: View {
         NavigationStack {
             Form {
                 Section("Datos del cliente") {
-                    TextField("Nombre completo", text: $nombre)
-                    TextField("Cédula", text: $cedula)
-                        .keyboardType(.numbersAndPunctuation)
-                    TextField("Teléfono", text: $telefono)
-                        .keyboardType(.phonePad)
-                    TextField("Correo (opcional)", text: $correo)
-                        .keyboardType(.emailAddress)
-                        .textInputAutocapitalization(.never)
+                    CampoTexto(titulo: "Nombre completo", ejemplo: "Ej: Juan Pérez", texto: $nombre,
+                               autocap: .words)
+                    CampoTexto(titulo: "Cédula", ejemplo: "Ej: 0102030405", texto: $cedula,
+                               keyboard: .numbersAndPunctuation)
+                    CampoTexto(titulo: "Teléfono", ejemplo: "Ej: 0991234567", texto: $telefono,
+                               keyboard: .phonePad)
+                    CampoTexto(titulo: "Correo (opcional)", ejemplo: "Ej: juan@correo.com", texto: $correo,
+                               keyboard: .emailAddress, autocap: .never)
                 }
             }
             .navigationTitle(titulo)

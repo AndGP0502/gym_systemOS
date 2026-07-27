@@ -128,6 +128,31 @@ struct PagosRepo {
         } catch { return false }
     }
 
+    /// Edita el monto de un pago ya registrado, ajustando la suscripción por la
+    /// diferencia (delta). Devuelve el resultado.
+    func editarPago(id: Int64, nuevoMonto: Double) -> OperationResult {
+        if nuevoMonto <= 0 { return .fallo("Monto inválido") }
+        do {
+            return try db.dbWriter.write { dbc in
+                guard let row = try Row.fetchOne(dbc,
+                    sql: "SELECT suscripcion_id, monto FROM pagos WHERE id = ?", arguments: [id]) else {
+                    return .fallo("El pago no existe")
+                }
+                let susId: Int64 = row["suscripcion_id"]
+                let montoViejo: Double = row["monto"]
+                let delta = nuevoMonto - montoViejo
+                try dbc.execute(sql: "UPDATE pagos SET monto = ? WHERE id = ?", arguments: [nuevoMonto, id])
+                try dbc.execute(sql: """
+                    UPDATE suscripciones
+                    SET pagado = MAX(0, COALESCE(pagado,0) + ?),
+                        pendiente = MAX(0, COALESCE(precio_total,0) - (COALESCE(pagado,0) + ?))
+                    WHERE id = ?
+                """, arguments: [delta, delta, susId])
+                return .exito("Pago actualizado correctamente")
+            }
+        } catch { return .fallo("Error de base de datos: \(error.localizedDescription)") }
+    }
+
     /// Totales para las tarjetas resumen del módulo Pagos.
     struct Totales { var total = 0; var pagadas = 0; var pendientes = 0; var recaudado = 0.0 }
 

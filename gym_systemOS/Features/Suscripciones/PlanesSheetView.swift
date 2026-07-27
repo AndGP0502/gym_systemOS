@@ -7,7 +7,8 @@
 
 import SwiftUI
 
-struct PlanesView: View {
+/// Hoja de gestión de planes accesible desde Suscripciones (reusa su VM).
+struct PlanesSheetView: View {
     @ObservedObject var vm: SuscripcionesViewModel
     @Environment(\.dismiss) private var dismiss
 

@@ -15,11 +15,22 @@ final class ClientesViewModel: ObservableObject {
     @Published var mostrarMensaje = false
 
     private var repo: ClientesRepo?
+    private var fichaRepo: FichaRepo?
 
     func setup(db: AppDatabase) {
         guard repo == nil else { return }
         repo = ClientesRepo(db: db)
+        fichaRepo = FichaRepo(db: db)
         recargar()
+    }
+
+    /// Genera el PDF con la información del cliente (datos + ficha + medidas).
+    func fichaPDF(_ c: Cliente) -> Data? {
+        guard let fichaRepo, let id = c.id else { return nil }
+        return FichaPDF.generar(cliente: c,
+                                ficha: fichaRepo.obtener(clienteId: id),
+                                historial: fichaRepo.historial(clienteId: id),
+                                foto: fichaRepo.fotoData(clienteId: id))
     }
 
     func recargar() {

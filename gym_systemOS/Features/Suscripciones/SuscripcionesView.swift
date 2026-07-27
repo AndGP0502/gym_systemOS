@@ -15,7 +15,7 @@ struct SuscripcionesView: View {
     @State private var mostrarNueva = false
     @State private var mostrarPlanes = false
     @State private var renovar: SuscripcionDetalle?
-    @State private var editarFechas: SuscripcionDetalle?
+    @State private var editar: SuscripcionDetalle?
     @State private var aEliminar: SuscripcionDetalle?
 
     var body: some View {
@@ -26,20 +26,24 @@ struct SuscripcionesView: View {
                     description: Text("Asigna un plan a un cliente con el botón +."))
             } else {
                 ForEach(vm.suscripciones) { s in
-                    SuscripcionFila(s: s)
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) { aEliminar = s } label: {
-                                Label("Eliminar", systemImage: "trash")
-                            }
-                            Button { renovar = s } label: {
-                                Label("Renovar", systemImage: "arrow.clockwise")
-                            }.tint(.blue)
+                    HStack {
+                        SuscripcionFila(s: s)
+                        Menu {
+                            Button { editar = s } label: { Label("Editar (plan y fechas)", systemImage: "pencil") }
+                            Button { renovar = s } label: { Label("Renovar", systemImage: "arrow.clockwise") }
+                            Button(role: .destructive) { aEliminar = s } label: { Label("Eliminar", systemImage: "trash") }
+                        } label: {
+                            Image(systemName: "ellipsis.circle").font(.title3).foregroundStyle(.tint)
                         }
-                        .swipeActions(edge: .leading) {
-                            Button { editarFechas = s } label: {
-                                Label("Fechas", systemImage: "calendar")
-                            }.tint(.indigo)
-                        }
+                        .buttonStyle(.borderless)
+                    }
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) { aEliminar = s } label: { Label("Eliminar", systemImage: "trash") }
+                        Button { renovar = s } label: { Label("Renovar", systemImage: "arrow.clockwise") }.tint(.blue)
+                    }
+                    .swipeActions(edge: .leading) {
+                        Button { editar = s } label: { Label("Editar", systemImage: "pencil") }.tint(.indigo)
+                    }
                 }
             }
         }
@@ -61,16 +65,16 @@ struct SuscripcionesView: View {
             }
         }
         .sheet(isPresented: $mostrarPlanes) {
-            PlanesView(vm: vm)
+            PlanesSheetView(vm: vm)
         }
         .sheet(item: $renovar) { s in
             RenovarSheet(nombre: s.nombre) { dias, monto in
                 vm.renovar(clienteId: s.clienteId, dias: dias, monto: monto)
             }
         }
-        .sheet(item: $editarFechas) { s in
-            EditarFechasSheet(s: s) { inicio, venc in
-                vm.editarFechas(s, inicio: inicio, vencimiento: venc)
+        .sheet(item: $editar) { s in
+            EditarSuscripcionSheet(s: s, planes: vm.planes) { planId, inicio, venc in
+                vm.editarSuscripcion(s, nuevoPlanId: planId, inicio: inicio, vencimiento: venc)
             }
         }
         .alert("Eliminar suscripción",
@@ -174,17 +178,22 @@ private struct NuevaSuscripcionSheet: View {
 
 // MARK: - Renovar
 
-private struct EditarFechasSheet: View {
+private struct EditarSuscripcionSheet: View {
     let s: SuscripcionDetalle
-    let onGuardar: (String, String) -> Void
+    let planes: [Membresia]
+    /// (nuevoPlanId?, inicio, vencimiento)
+    let onGuardar: (Int64?, String, String) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @State private var planId: Int64?
     @State private var inicio: Date
     @State private var vencimiento: Date
 
-    init(s: SuscripcionDetalle, onGuardar: @escaping (String, String) -> Void) {
+    init(s: SuscripcionDetalle, planes: [Membresia], onGuardar: @escaping (Int64?, String, String) -> Void) {
         self.s = s
+        self.planes = planes
         self.onGuardar = onGuardar
+        _planId = State(initialValue: nil)
         _inicio = State(initialValue: Fechas.parse(s.fechaInicio) ?? Date())
         _vencimiento = State(initialValue: Fechas.parse(s.fechaVencimiento) ?? Date())
     }
@@ -192,18 +201,30 @@ private struct EditarFechasSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Fechas de \(s.nombre)") {
+                Section("Cliente") {
+                    LabeledContent("Nombre", value: s.nombre)
+                    LabeledContent("Plan actual", value: s.plan)
+                }
+                Section("Cambiar plan (opcional)") {
+                    Picker("Nuevo plan", selection: $planId) {
+                        Text("Mantener \(s.plan)").tag(Int64?.none)
+                        ForEach(planes) { p in
+                            Text("\(p.nombrePlan ?? "—") · \((p.precio ?? 0).comoMoneda)").tag(Int64?.some(p.id ?? -1))
+                        }
+                    }
+                }
+                Section("Fechas") {
                     DatePicker("Inicio", selection: $inicio, displayedComponents: .date)
                     DatePicker("Vencimiento", selection: $vencimiento, displayedComponents: .date)
                 }
             }
-            .navigationTitle("Editar fechas")
+            .navigationTitle("Editar suscripción")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Guardar") {
-                        onGuardar(Fechas.iso.string(from: inicio), Fechas.iso.string(from: vencimiento))
+                        onGuardar(planId, Fechas.iso.string(from: inicio), Fechas.iso.string(from: vencimiento))
                         dismiss()
                     }
                 }

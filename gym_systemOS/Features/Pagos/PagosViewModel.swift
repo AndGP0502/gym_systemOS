@@ -67,5 +67,10 @@ final class PagosViewModel: ObservableObject {
         pagosRepo?.eliminarPago(id: id); recargar()
     }
 
+    func editarPago(_ id: Int64, nuevoMonto: Double) {
+        let r = pagosRepo?.editarPago(id: id, nuevoMonto: nuevoMonto)
+        notificar(r?.mensaje ?? ""); recargar()
+    }
+
     private func notificar(_ m: String) { mensaje = m; mostrarMensaje = true }
 }

@@ -61,7 +61,7 @@ Leyenda: ✅ portada · 🟦 adaptada (equivalente iOS) · ⛔ excluida (con mot
 | obtener_ficha / guardar_ficha (upsert) | ✅ | FichaRepo + FichaView |
 | agregar_medida / obtener_historial / eliminar_medida / IMC | ✅ | FichaRepo (IMC = peso/altura²) |
 | guardar_foto / obtener_foto | ✅ | FichaRepo (PhotosPicker → contenedor app) |
-| generar_pdf_ficha_cliente | ⛔ | **Ver Exclusiones #2** |
+| generar_pdf_ficha_cliente | ✅ | FichaPDF (PDFKit) — botón **PDF** en cada cliente |
 
 ## Facturación SRI  (`services/factura_service.py`, `sri/*`, `ui/facturacion_ui.py`)
 | Función | Estado | Dónde |
@@ -110,10 +110,11 @@ Leyenda: ✅ portada · 🟦 adaptada (equivalente iOS) · ⛔ excluida (con mot
    copiar el `gym.db` migra los datos **sin pérdida** y sin conversión. (Si más adelante se
    requiere Excel específicamente, se puede añadir con un parser CSV/xlsx.)
 
-2. **PDF de ficha del cliente y reporte mensual** (`generar_pdf_ficha_cliente`,
-   `generar_pdf_reporte_mensual`). **Motivo**: se priorizó el **RIDE** (PDF de la factura), que es
-   el fiscalmente exigido y ya está implementado con PDFKit. Los otros dos son reportes internos y
-   se añaden con el mismo enfoque (`RidePDF`) cuando se necesiten.
+2. **PDF de reporte mensual** (`generar_pdf_reporte_mensual`). **Motivo**: reporte interno; el
+   RIDE (factura) y el **PDF de ficha del cliente** ya están implementados con PDFKit. Se añade con
+   el mismo enfoque cuando se necesite.
+   *(Actualización: el PDF de ficha del cliente ya NO está excluido — se implementó como
+   `FichaPDF` con botón **PDF** en cada cliente.)*
 
 3. **Fallback Selenium del portal SRI** (`sri/selenium_sri.py`). **Motivo**: **no aplica en iOS**
    (no hay Selenium/automatización de navegador). La vía **oficial SOAP** (recepción + autorización)

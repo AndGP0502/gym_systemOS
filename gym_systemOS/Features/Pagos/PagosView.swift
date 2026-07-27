@@ -173,6 +173,8 @@ private struct RegistrarPagoSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var montoText = ""
     @State private var historial: [Pago] = []
+    @State private var editandoPago: Pago?
+    @State private var montoEdit = ""
 
     var body: some View {
         NavigationStack {
@@ -202,11 +204,17 @@ private struct RegistrarPagoSheet: View {
                                 Text(p.fechaPago ?? "—")
                                 Spacer()
                                 Text((p.monto ?? 0).comoMoneda).bold()
+                                Image(systemName: "pencil").font(.caption).foregroundStyle(.blue)
                             }
+                            .contentShape(Rectangle())
+                            .onTapGesture { editandoPago = p; montoEdit = String(p.monto ?? 0) }
                             .swipeActions {
                                 Button(role: .destructive) {
                                     if let id = p.id { vm.eliminarPago(id); historial = vm.historial(s.id) }
                                 } label: { Label("Eliminar", systemImage: "trash") }
+                                Button {
+                                    editandoPago = p; montoEdit = String(p.monto ?? 0)
+                                } label: { Label("Editar", systemImage: "pencil") }.tint(.blue)
                             }
                         }
                     }
@@ -216,6 +224,18 @@ private struct RegistrarPagoSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Cerrar") { dismiss() } } }
             .onAppear { historial = vm.historial(s.id) }
+            .alert("Editar pago", isPresented: Binding(get: { editandoPago != nil },
+                                                       set: { if !$0 { editandoPago = nil } })) {
+                TextField("Nuevo monto", text: $montoEdit).keyboardType(.decimalPad)
+                Button("Guardar") {
+                    if let id = editandoPago?.id {
+                        vm.editarPago(id, nuevoMonto: Double(montoEdit.replacingOccurrences(of: ",", with: ".")) ?? 0)
+                        historial = vm.historial(s.id)
+                    }
+                    editandoPago = nil
+                }
+                Button("Cancelar", role: .cancel) { editandoPago = nil }
+            } message: { Text("Ajusta el monto de este pago. La suscripción se recalcula automáticamente.") }
         }
     }
 }

@@ -19,12 +19,14 @@ final class SuscripcionesViewModel: ObservableObject {
     private var susRepo: SuscripcionesRepo?
     private var memRepo: MembresiasRepo?
     private var cliRepo: ClientesRepo?
+    private var pagosRepo: PagosRepo?
 
     func setup(db: AppDatabase) {
         guard susRepo == nil else { return }
         susRepo = SuscripcionesRepo(db: db)
         memRepo = MembresiasRepo(db: db)
         cliRepo = ClientesRepo(db: db)
+        pagosRepo = PagosRepo(db: db)
         recargar()
     }
 
@@ -56,6 +58,18 @@ final class SuscripcionesViewModel: ObservableObject {
         guard let susRepo else { return }
         let r = susRepo.editarFechas(id: s.id, fechaInicio: inicio, fechaVencimiento: vencimiento)
         notificar(r.mensaje); if r.ok { recargar() }
+    }
+
+    /// Edición combinada: opcionalmente cambia el plan y ajusta las fechas.
+    func editarSuscripcion(_ s: SuscripcionDetalle, nuevoPlanId: Int64?, inicio: String, vencimiento: String) {
+        guard let susRepo else { return }
+        // Si cambia el plan, primero se aplica (recalcula precio); luego se fijan las fechas elegidas.
+        if let planId = nuevoPlanId {
+            _ = pagosRepo?.cambiarPlan(suscripcionId: s.id, nuevoPlanId: planId)
+        }
+        let r = susRepo.editarFechas(id: s.id, fechaInicio: inicio, fechaVencimiento: vencimiento)
+        notificar(r.ok ? "Suscripción actualizada correctamente" : r.mensaje)
+        recargar()
     }
 
     // Planes

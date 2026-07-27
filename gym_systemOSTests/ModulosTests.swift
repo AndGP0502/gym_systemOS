@@ -116,6 +116,25 @@ final class ModulosTests: XCTestCase {
         XCTAssertEqual(r.recaudadoTotal, 30, accuracy: 0.001)
     }
 
+    // MARK: - Editar pago
+
+    func testEditarPago() throws {
+        let db = nuevaDB()
+        let (cid, mid) = clienteYPlan(db, dur: 30, precio: 30)
+        let sus = SuscripcionesRepo(db: db); let pag = PagosRepo(db: db)
+        _ = sus.asignar(clienteId: cid, membresiaId: mid, precioTotal: 30, pagado: 0)
+        let sid = sus.verCompletas().first!.id
+        _ = pag.registrar(suscripcionId: sid, monto: 10)
+        let pid = pag.historial(suscripcionId: sid).first!.id!
+
+        // Editar 10 → 25: la suscripción sube a pagado 25, pendiente 5
+        XCTAssertTrue(pag.editarPago(id: pid, nuevoMonto: 25).ok)
+        let d = sus.verCompletas().first!
+        XCTAssertEqual(d.pagado, 25, accuracy: 0.001)
+        XCTAssertEqual(d.pendiente, 5, accuracy: 0.001)
+        XCTAssertEqual(pag.historial(suscripcionId: sid).first?.monto, 25)
+    }
+
     // MARK: - Orquestador de facturación (mock SOAP)
 
     private func prepararFactura(_ db: AppDatabase, siguienteSecuencial: Int = 1) -> Int64 {

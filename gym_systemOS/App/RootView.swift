@@ -12,6 +12,7 @@ enum Modulo: String, CaseIterable, Identifiable {
     case inicio        = "Inicio"
     case clientes      = "Clientes"
     case asistencia    = "Asistencia"
+    case planes        = "Planes"
     case suscripciones = "Suscripciones"
     case pagos         = "Pagos"
     case caducados     = "Clientes Caducados"
@@ -25,6 +26,7 @@ enum Modulo: String, CaseIterable, Identifiable {
         case .inicio:        return "house.fill"
         case .clientes:      return "person.2.fill"
         case .asistencia:    return "figure.walk.circle.fill"
+        case .planes:        return "list.bullet.rectangle.fill"
         case .suscripciones: return "creditcard.fill"
         case .pagos:         return "dollarsign.circle.fill"
         case .caducados:     return "person.crop.circle.badge.exclamationmark"
@@ -64,6 +66,7 @@ struct RootView: View {
         case .inicio:        DashboardView()
         case .clientes:      ClientesView()
         case .asistencia:    AsistenciaView()
+        case .planes:        PlanesView()
         case .suscripciones: SuscripcionesView()
         case .pagos:         PagosView()
         case .caducados:     CaducadosView()
