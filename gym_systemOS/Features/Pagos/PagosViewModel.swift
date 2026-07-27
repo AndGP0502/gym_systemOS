@@ -67,6 +67,10 @@ final class PagosViewModel: ObservableObject {
         notificar(r?.mensaje ?? ""); recargar()
     }
 
+    func eliminarSuscripcion(_ s: SuscripcionDetalle) {
+        susRepo?.eliminar(id: s.id); recargar()
+    }
+
     func registrar(suscripcionId: Int64, monto: Double) {
         guard let pagosRepo else { return }
         let r = pagosRepo.registrar(suscripcionId: suscripcionId, monto: monto)

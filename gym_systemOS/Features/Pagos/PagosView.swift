@@ -15,6 +15,7 @@ struct PagosView: View {
     @State private var cambiarPlan: SuscripcionDetalle?
     @State private var crearRapida = false
     @State private var compartir: IdentifiableURL?
+    @State private var aEliminar: SuscripcionDetalle?
 
     private let cols = [GridItem(.adaptive(minimum: 160), spacing: 12)]
 
@@ -41,9 +42,15 @@ struct PagosView: View {
                             .contextMenu {
                                 Button { pagar = s } label: { Label("Registrar pago", systemImage: "dollarsign.circle") }
                                 Button { cambiarPlan = s } label: { Label("Cambiar plan", systemImage: "arrow.left.arrow.right") }
-                                Button(role: .destructive) { vm.resetearPago(s.id) } label: {
+                                Button { vm.resetearPago(s.id) } label: {
                                     Label("Resetear pago", systemImage: "arrow.counterclockwise")
                                 }
+                                Button(role: .destructive) { aEliminar = s } label: {
+                                    Label("Eliminar suscripción", systemImage: "trash")
+                                }
+                            }
+                            .swipeActions(edge: .trailing) {
+                                Button(role: .destructive) { aEliminar = s } label: { Label("Eliminar", systemImage: "trash") }
                             }
                     }
                 }
@@ -82,6 +89,11 @@ struct PagosView: View {
             CrearRapidaSheet(clientes: vm.clientes, planes: vm.planes) { cid, mid in vm.crearRapida(clienteId: cid, membresiaId: mid) }
         }
         .sheet(item: $compartir) { item in ShareSheet(items: [item.url]) }
+        .alert("Eliminar suscripción",
+               isPresented: Binding(get: { aEliminar != nil }, set: { if !$0 { aEliminar = nil } })) {
+            Button("Eliminar", role: .destructive) { if let s = aEliminar { vm.eliminarSuscripcion(s) }; aEliminar = nil }
+            Button("Cancelar", role: .cancel) { aEliminar = nil }
+        } message: { Text("¿Eliminar la suscripción de \(aEliminar?.nombre ?? "") y sus pagos?") }
         .alert(vm.mensaje ?? "", isPresented: $vm.mostrarMensaje) { Button("OK", role: .cancel) {} }
     }
 

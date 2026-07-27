@@ -144,10 +144,27 @@ struct ClientesRepo {
 
     // MARK: - Eliminar
 
+    /// Elimina un cliente EN CASCADA: sus suscripciones, pagos, ficha, medidas y
+    /// asistencias, para que no queden datos huérfanos en ningún módulo
+    /// (Caducados, Pagos, Dashboard). Todo en una sola transacción.
     @discardableResult
     func eliminar(id: Int64) -> Bool {
-        (try? db.dbWriter.write { dbc in
-            try dbc.execute(sql: "DELETE FROM clientes WHERE id = ?", arguments: [id])
-        }) != nil
+        do {
+            try db.dbWriter.write { dbc in
+                try dbc.execute(sql: """
+                    DELETE FROM pagos WHERE suscripcion_id IN
+                        (SELECT id FROM suscripciones WHERE cliente_id = ?)
+                """, arguments: [id])
+                try dbc.execute(sql: "DELETE FROM suscripciones WHERE cliente_id = ?", arguments: [id])
+                try dbc.execute(sql: "DELETE FROM ficha_cliente WHERE cliente_id = ?", arguments: [id])
+                try dbc.execute(sql: "DELETE FROM historial_medidas WHERE cliente_id = ?", arguments: [id])
+                try dbc.execute(sql: "DELETE FROM asistencia WHERE cliente_id = ?", arguments: [id])
+                // Las facturas son comprobantes fiscales: NO se borran, solo se
+                // desvinculan del cliente (evita violar la llave foránea).
+                try dbc.execute(sql: "UPDATE facturas SET cliente_id = NULL WHERE cliente_id = ?", arguments: [id])
+                try dbc.execute(sql: "DELETE FROM clientes WHERE id = ?", arguments: [id])
+            }
+            return true
+        } catch { return false }
     }
 }

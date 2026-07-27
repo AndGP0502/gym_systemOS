@@ -28,7 +28,11 @@ final class PlanesViewModel: ObservableObject {
         let r = repo?.editar(id: id, nombrePlan: nombre, precio: precio, duracionDias: dias)
         notificar(r?.mensaje ?? ""); if r?.ok == true { recargar() }
     }
-    func eliminar(_ m: Membresia) { if let id = m.id { repo?.eliminar(id: id); recargar() } }
+    func eliminar(_ m: Membresia) {
+        guard let id = m.id else { return }
+        let r = repo?.eliminar(id: id)
+        notificar(r?.mensaje ?? ""); recargar()
+    }
 
     private func notificar(_ m: String) { mensaje = m; mostrarMensaje = true }
 }
@@ -38,6 +42,7 @@ struct PlanesView: View {
     @StateObject private var vm = PlanesViewModel()
     @State private var editando: Membresia?
     @State private var mostrarNuevo = false
+    @State private var aEliminar: Membresia?
 
     var body: some View {
         List {
@@ -46,21 +51,24 @@ struct PlanesView: View {
                     description: Text("Crea el primer plan con el botón +."))
             } else {
                 ForEach(vm.planes) { p in
-                    Button { editando = p } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(p.nombrePlan ?? "—").font(.headline)
-                                Text("\(p.duracionDias ?? 0) días").font(.caption).foregroundStyle(.secondary)
+                    HStack(spacing: 12) {
+                        Button { editando = p } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(p.nombrePlan ?? "—").font(.headline)
+                                    Text("\(p.duracionDias ?? 0) días").font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Text((p.precio ?? 0).comoMoneda).font(.title3).bold().foregroundStyle(.tint)
                             }
-                            Spacer()
-                            Text((p.precio ?? 0).comoMoneda).font(.title3).bold().foregroundStyle(.tint)
-                            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
                         }
-                        .padding(.vertical, 4)
+                        .buttonStyle(.plain)
+                        botonAccion("Editar", "pencil", .blue) { editando = p }
+                        botonAccion("Eliminar", "trash.fill", .red) { aEliminar = p }
                     }
-                    .buttonStyle(.plain)
+                    .padding(.vertical, 4)
                     .swipeActions {
-                        Button(role: .destructive) { vm.eliminar(p) } label: { Label("Quitar", systemImage: "trash") }
+                        Button(role: .destructive) { aEliminar = p } label: { Label("Quitar", systemImage: "trash") }
                     }
                 }
             }
@@ -78,7 +86,26 @@ struct PlanesView: View {
         .sheet(item: $editando) { m in
             PlanForm(titulo: "Editar plan", plan: m) { n, p, d in vm.editar(m, nombre: n, precio: p, dias: d) }
         }
+        .alert("Eliminar plan",
+               isPresented: Binding(get: { aEliminar != nil }, set: { if !$0 { aEliminar = nil } })) {
+            Button("Eliminar", role: .destructive) { if let p = aEliminar { vm.eliminar(p) }; aEliminar = nil }
+            Button("Cancelar", role: .cancel) { aEliminar = nil }
+        } message: { Text("¿Eliminar el plan \(aEliminar?.nombrePlan ?? "")?") }
         .alert(vm.mensaje ?? "", isPresented: $vm.mostrarMensaje) { Button("OK", role: .cancel) {} }
+    }
+
+    private func botonAccion(_ titulo: String, _ icono: String, _ color: Color,
+                             _ accion: @escaping () -> Void) -> some View {
+        Button(action: accion) {
+            VStack(spacing: 2) {
+                Image(systemName: icono).font(.title3)
+                Text(titulo).font(.caption2)
+            }
+            .frame(width: 56, height: 44)
+            .foregroundStyle(color)
+            .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.borderless)
     }
 }
 

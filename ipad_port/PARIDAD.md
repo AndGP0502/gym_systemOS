@@ -135,3 +135,21 @@ Leyenda: ✅ portada · 🟦 adaptada (equivalente iOS) · ⛔ excluida (con mot
    búsqueda y los filtros mes/año de Caducados.)*
 
 Todo lo demás del `.exe` está portado (✅) o adaptado a su equivalente iOS (🟦).
+
+---
+
+## Coherencia de datos (integridad referencial)
+
+Cada módulo con ingreso de datos tiene **botón de eliminar visible** (Clientes, Planes,
+Suscripciones, Pagos, Facturación, Ficha/medidas). El borrado mantiene la coherencia global:
+
+- **Eliminar cliente** → borra **en cascada** sus suscripciones, pagos, ficha, medidas y
+  asistencias, y **desvincula** sus facturas (comprobantes fiscales: no se borran). Así el cliente
+  desaparece de Caducados, Pagos, Suscripciones y de los contadores del Dashboard sin dejar
+  huérfanos. *(Antes fallaba en silencio por la llave foránea; corregido.)*
+- **Eliminar suscripción** → borra también sus pagos.
+- **Eliminar plan** → **bloqueado** si alguna suscripción lo usa (mensaje claro), para no dejar
+  suscripciones sin plan.
+- **Eliminar factura** → prohibido si está AUTORIZADA (validez fiscal).
+
+Verificado con pruebas `testBorradoClienteEnCascada` y `testNoEliminarPlanEnUso` (suite 19/19).

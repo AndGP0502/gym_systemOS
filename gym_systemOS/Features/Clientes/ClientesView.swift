@@ -138,8 +138,9 @@ struct ClientesView: View {
             HStack(spacing: 6) {
                 accion("Ficha", "doc.text.image", .indigo) { fichaDe = c }
                 accion("WhatsApp", "message.fill", .green) { enviarWhatsApp(c) }
-                accion("PDF", "arrow.down.doc.fill", .red) { generarPDF(c) }
+                accion("PDF", "arrow.down.doc.fill", .orange) { generarPDF(c) }
                 accion("Editar", "pencil", .blue) { editando = c }
+                accion("Eliminar", "trash.fill", .red) { aEliminar = c }
             }
         }
         .padding(.vertical, 4)
@@ -152,7 +153,7 @@ struct ClientesView: View {
                 Image(systemName: icono).font(.title3)
                 Text(titulo).font(.caption2)
             }
-            .frame(width: 58, height: 44)
+            .frame(width: 52, height: 44)
             .foregroundStyle(color)
             .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
         }

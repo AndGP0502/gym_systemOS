@@ -168,6 +168,60 @@ final class ModulosTests: XCTestCase {
         XCTAssertEqual(r.conDeuda, 1)
     }
 
+    // MARK: - Coherencia: borrado en cascada
+
+    func testBorradoClienteEnCascada() throws {
+        let db = nuevaDB()
+        let cli = ClientesRepo(db: db); let mem = MembresiasRepo(db: db)
+        let sus = SuscripcionesRepo(db: db); let pag = PagosRepo(db: db)
+        let ficha = FichaRepo(db: db); let asi = AsistenciaRepo(db: db)
+
+        _ = cli.agregar(nombre: "Ana", cedula: "111", telefono: "1")
+        _ = mem.crear(nombrePlan: "M", precio: 30, duracionDias: 30)
+        let cid = cli.ver().first!.id!
+        let mid = mem.ver().first!.id!
+        _ = sus.asignar(clienteId: cid, membresiaId: mid, precioTotal: 30, pagado: 10)
+        let sid = sus.verCompletas().first!.id
+        _ = pag.registrar(suscripcionId: sid, monto: 5)
+        _ = ficha.guardar(FichaCliente(clienteId: cid, objetivo: "X"))
+        _ = ficha.agregarMedida(clienteId: cid, pesoKg: 80, alturaCm: 180)
+        _ = asi.registrar(cedula: "111")
+
+        // Factura del cliente (comprobante fiscal): debe SOBREVIVIR desvinculada.
+        let facRepo = FacturacionRepo(db: db)
+        var f = Factura(); f.clienteId = cid; f.razonSocial = "Ana"; f.total = 10
+        _ = facRepo.guardarFactura(f, detalles: [])
+
+        XCTAssertEqual(sus.verCompletas().count, 1)
+
+        // Borrar el cliente debe eliminar TODO lo suyo (sin datos huérfanos).
+        XCTAssertTrue(cli.eliminar(id: cid))
+        XCTAssertEqual(cli.contar(), 0)
+        XCTAssertEqual(sus.verCompletas().count, 0)
+        XCTAssertEqual(sus.contarVencidas() + sus.contarActivos(), 0)  // dashboard coherente
+        XCTAssertEqual(pag.historial(suscripcionId: sid).count, 0)
+        XCTAssertNil(ficha.obtener(clienteId: cid))
+        XCTAssertEqual(ficha.historial(clienteId: cid).count, 0)
+        XCTAssertEqual(asi.historialDe(clienteId: cid).count, 0)
+        // La factura sigue existiendo (desvinculada del cliente).
+        XCTAssertEqual(facRepo.verFacturas().count, 1)
+        XCTAssertNil(facRepo.verFacturas().first?.clienteId)
+    }
+
+    func testNoEliminarPlanEnUso() throws {
+        let db = nuevaDB()
+        let (cid, mid) = clienteYPlan(db)
+        let mem = MembresiasRepo(db: db); let sus = SuscripcionesRepo(db: db)
+        _ = sus.asignar(clienteId: cid, membresiaId: mid, precioTotal: 30, pagado: 0)
+        // Plan en uso → no se puede eliminar
+        XCTAssertFalse(mem.eliminar(id: mid).ok)
+        XCTAssertEqual(mem.ver().count, 1)
+        // Sin suscripciones → sí se elimina
+        sus.eliminar(id: sus.verCompletas().first!.id)
+        XCTAssertTrue(mem.eliminar(id: mid).ok)
+        XCTAssertEqual(mem.ver().count, 0)
+    }
+
     // MARK: - Orquestador de facturación (mock SOAP)
 
     private func prepararFactura(_ db: AppDatabase, siguienteSecuencial: Int = 1) -> Int64 {

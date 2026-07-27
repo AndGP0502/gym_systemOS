@@ -50,10 +50,19 @@ struct MembresiasRepo {
         }) ?? []
     }
 
+    /// Elimina un plan solo si NINGUNA suscripción lo usa (coherencia de datos).
     @discardableResult
-    func eliminar(id: Int64) -> Bool {
-        (try? db.dbWriter.write { dbc in
-            try dbc.execute(sql: "DELETE FROM membresias WHERE id = ?", arguments: [id])
-        }) != nil
+    func eliminar(id: Int64) -> OperationResult {
+        do {
+            return try db.dbWriter.write { dbc in
+                let enUso = try Int.fetchOne(dbc,
+                    sql: "SELECT COUNT(*) FROM suscripciones WHERE membresia_id = ?", arguments: [id]) ?? 0
+                if enUso > 0 {
+                    return .fallo("No se puede eliminar: \(enUso) suscripción(es) usan este plan. Cámbialas o elimínalas primero.")
+                }
+                try dbc.execute(sql: "DELETE FROM membresias WHERE id = ?", arguments: [id])
+                return .exito("Plan eliminado")
+            }
+        } catch { return .fallo("Error de base de datos: \(error.localizedDescription)") }
     }
 }

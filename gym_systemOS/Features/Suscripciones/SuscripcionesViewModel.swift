@@ -101,7 +101,8 @@ final class SuscripcionesViewModel: ObservableObject {
 
     func eliminarPlan(_ m: Membresia) {
         guard let memRepo, let id = m.id else { return }
-        memRepo.eliminar(id: id); recargar()
+        let r = memRepo.eliminar(id: id)
+        notificar(r.mensaje); recargar()
     }
 
     private func notificar(_ m: String) { mensaje = m; mostrarMensaje = true }
