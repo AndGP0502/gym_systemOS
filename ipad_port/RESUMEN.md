@@ -14,27 +14,34 @@ con firma XAdES-BES** — sin Java, sin OpenSSL, sin backend remoto.
 | Módulo | Estado | Notas |
 |---|---|---|
 | Base de datos (GRDB) | ✅ | Migración que replica **exacto** el esquema de `gym.db` (10 tablas) |
-| Clientes | ✅ | CRUD + búsqueda por cédula/nombre + IDs por hueco más bajo |
-| Suscripciones | ✅ | Asignar plan, renovar, buscar, estado/vencimiento; gestión de Planes |
-| Pagos | ✅ | Tarjetas resumen + color-coding (pagado/parcial/deuda/vencido) + histórico |
-| Clientes Caducados | ✅ | Filtros mes/año + color-coding por antigüedad (≤7 / 8–30 / >30 días) |
-| Facturación SRI | ✅ | Clave de acceso (mód. 11) → XML v2.1.0 → **firma XAdES-BES** → SOAP recepción → polling autorización (8×4s) → reintento secuencial (error 45) |
-| Configuración | ✅ | Datos del emisor + carga de `.p12` (Keychain, en runtime) |
+| **Inicio (Dashboard)** | ✅ | Métricas (clientes/activos/vencidos/ingresos) + gráficas (Swift Charts) |
+| Clientes | ✅ | CRUD + búsqueda + recordatorios WhatsApp/correo + acceso a Ficha |
+| **Asistencia** | ✅ | Check-in por cédula con estado de membresía + historial |
+| Suscripciones | ✅ | Asignar/renovar/editar fechas, buscar, estado; gestión de Planes |
+| Pagos | ✅ | Tarjetas + color-coding + histórico + cambiar plan/resetear/rápida |
+| Clientes Caducados | ✅ | Filtros mes/año + color-coding por antigüedad |
+| **Ficha del cliente** | ✅ | Datos físicos/médicos + foto + historial de medidas (IMC) |
+| Facturación SRI | ✅ | XML v2.1.0 → **XAdES-BES** → SOAP → polling → reintento; borrador + **RIDE PDF** |
+| Configuración | ✅ | Emisor + `.p12` (Keychain) + **PIN** + exportar/importar BD |
 | Firma XAdES-BES | ✅ (auto-consistencia probada) | libxml2 (C14N) + CryptoKit (SHA1) + Security (RSA-SHA1) |
 | Cliente SOAP SRI | ✅ (sin validar contra WS real) | URLSession + sobres SOAP + XMLParser (reemplaza zeep) |
 
-### Pendiente (esquema ya soportado, fuera del alcance de esta iteración)
-Ficha médica + historial de medidas, asistencia, importación Excel, gráficas/dashboard,
-generación de **RIDE PDF** (PDFKit), envío por email (SMTP/MFMailCompose), backups automáticos.
-Las tablas correspondientes ya existen en la BD, así que estas fases no requieren migración.
+### Paridad con el `.exe`
+Ver **[PARIDAD.md](PARIDAD.md)** para la matriz función-por-función. Exclusiones justificadas:
+import/export **Excel** (sustituido por export/import de `gym.db`), **PDF de ficha/reporte
+mensual** (diferidos; el RIDE sí está), **Selenium** (no aplica en iOS), **logo/acerca-de**
+(cosmético) y **borrados masivos** (cubiertos por borrado por elemento + importar BD).
 
 ### Verificación
-- **Compilación**: `xcodebuild build` en verde tras cada fase.
-- **Pruebas** (`xcodebuild test`, 8/8 en verde):
-  - `testFirmaXAdESAutoConsistente`: firma RSA sobre SignedInfo válida + 3 digests correctos.
-  - `testIssuerRFC4514_yModExp`, `testC14NBasico`, `testModulo11Deterministico`.
-  - Integración de repos: CRUD/ID hueco, vencimiento, reglas de pago, caducados, secuencial.
-- **Arranque visual**: verificado en Simulador iPad Pro 13" (iOS 26.5) vía captura.
+- **Compilación**: `xcodebuild build` en verde tras cada fase/grupo.
+- **Pruebas** (`xcodebuild test`, **14/14** en verde):
+  - Firma/SRI: `testFirmaXAdESAutoConsistente` (firma RSA + 3 digests), `testIssuerRFC4514_yModExp`,
+    `testC14NBasico`, `testModulo11Deterministico`.
+  - Datos/negocio: CRUD/ID hueco, vencimiento, reglas de pago, caducados vs activos, secuencial.
+  - Módulos: Ficha+IMC, Asistencia, Dashboard, cambiar plan/resetear/editar fechas.
+  - **Orquestador SRI con mock SOAP**: happy-path (RECIBIDA→AUTORIZADO) y **reintento de
+    secuencial** (error 45 → reserva nuevo → autoriza).
+- **Arranque visual**: Dashboard con datos reales verificado en Simulador iPad Pro 13" (iOS 26.5).
 
 ---
 
