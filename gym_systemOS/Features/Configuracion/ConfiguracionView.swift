@@ -25,6 +25,7 @@ struct ConfiguracionView: View {
     @State private var pinConfigurado = AppSettings.pinConfigurado
     @State private var csvURLs: [URL] = []
     @State private var mostrarCSVShare = false
+    @State private var dropTargeted = false
 
     var body: some View {
         Form {
@@ -59,20 +60,18 @@ struct ConfiguracionView: View {
                     if let h = info.validoHasta { LabeledContent("Válido hasta", value: h) }
                     Button("Quitar certificado", role: .destructive) { vm.quitarCertificado() }
                 } else {
-                    Text("1) Selecciona el archivo .p12.  2) Escribe su clave.  3) Toca «Cargar certificado».")
+                    Text("1) Trae tu .p12 (arrástralo aquí o usa «Seleccionar»).  2) Escribe su clave.  3) «Cargar certificado».")
                         .font(.caption).foregroundStyle(.secondary)
-                    // 1) Selección de archivo — SIEMPRE abre el selector.
+                    zonaArrastre
                     Button { mostrarPicker = true } label: {
-                        Label(vm.p12Nombre == nil ? "Seleccionar archivo .p12" : "Archivo: \(vm.p12Nombre!)",
+                        Label(vm.p12Nombre == nil ? "…o Seleccionar archivo .p12" : "Archivo: \(vm.p12Nombre!)",
                               systemImage: vm.p12Nombre == nil ? "doc.badge.plus" : "checkmark.circle.fill")
                     }
-                    // 2) Clave
                     SecureField("Clave del certificado", text: $vm.clave)
-                    // 3) Cargar
-                    Button {
-                        vm.cargarCertificado()
-                    } label: { Label("Cargar certificado", systemImage: "key.fill") }
-                        .disabled(vm.p12Data == nil)
+                    Button { vm.cargarCertificado() } label: {
+                        Label("Cargar certificado", systemImage: "key.fill")
+                    }
+                    .disabled(vm.p12Data == nil)
                     Text("El certificado se guarda cifrado en el Keychain del dispositivo. Nunca se incluye en la app.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
@@ -166,6 +165,27 @@ struct ConfiguracionView: View {
         case .failure(let error):
             vm.mensaje = error.localizedDescription; vm.mostrarMensaje = true
         }
+    }
+
+    /// Zona para arrastrar el .p12 directamente sobre la app (evita que iOS lo
+    /// intercepte como perfil de certificado / abra Safari al soltarlo).
+    private var zonaArrastre: some View {
+        let borde: Color = dropTargeted ? .accentColor : .secondary
+        let texto = vm.p12Nombre.map { "✓ \($0)" } ?? "Arrastra aquí tu archivo .p12"
+        let colorTexto: Color = vm.p12Nombre == nil ? .secondary : .green
+        return RoundedRectangle(cornerRadius: 10)
+            .strokeBorder(borde, style: StrokeStyle(lineWidth: 1.5, dash: [6]))
+            .frame(height: 64)
+            .overlay {
+                Label(texto, systemImage: "square.and.arrow.down")
+                    .font(.callout)
+                    .foregroundStyle(colorTexto)
+            }
+            .dropDestination(for: Data.self) { items, _ in
+                guard let d = items.first, !d.isEmpty else { return false }
+                vm.archivoSeleccionado(data: d, nombre: "certificado.p12")
+                return true
+            } isTargeted: { dropTargeted = $0 }
     }
 
     private func campo(_ titulo: String, text: Binding<String>,
