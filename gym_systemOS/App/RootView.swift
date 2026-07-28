@@ -38,6 +38,7 @@ enum Modulo: String, CaseIterable, Identifiable {
 
 struct RootView: View {
     @Environment(\.appDatabase) private var db
+    @EnvironmentObject private var inbox: CertificadoInbox
     @State private var seleccion: Modulo? = .inicio
     @State private var columnas: NavigationSplitViewVisibility = .all
 
@@ -58,6 +59,13 @@ struct RootView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
+        // Si el cliente comparte un .p12 a la app, ir directo a Configuración.
+        .onChange(of: inbox.nombre) { _, nuevo in
+            if nuevo != nil { seleccion = .configuracion }
+        }
+        .onAppear {
+            if inbox.nombre != nil { seleccion = .configuracion }
+        }
     }
 
     @ViewBuilder

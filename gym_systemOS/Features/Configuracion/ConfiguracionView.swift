@@ -10,6 +10,7 @@ import UniformTypeIdentifiers
 
 struct ConfiguracionView: View {
     @Environment(\.appDatabase) private var db
+    @EnvironmentObject private var inbox: CertificadoInbox
     @StateObject private var vm = ConfiguracionViewModel()
     @State private var mostrarPicker = false
 
@@ -113,7 +114,8 @@ struct ConfiguracionView: View {
                 Button("Guardar") { vm.guardar() }
             }
         }
-        .task { vm.setup(db: db) }
+        .task { vm.setup(db: db); consumirInbox() }
+        .onChange(of: inbox.nombre) { _, _ in consumirInbox() }
         .fileImporter(isPresented: $mostrarPicker,
                       allowedContentTypes: Self.tiposP12,
                       allowsMultipleSelection: false) { result in
@@ -193,6 +195,15 @@ struct ConfiguracionView: View {
         TextField(titulo, text: text)
             .keyboardType(keyboard)
             .autocorrectionDisabled()
+    }
+
+    /// Toma el .p12 que el cliente compartió a la app (Compartir → gym_systemOS).
+    private func consumirInbox() {
+        if let recibido = inbox.consumir() {
+            vm.archivoSeleccionado(data: recibido.data, nombre: recibido.nombre)
+            vm.mensaje = "Certificado recibido: \(recibido.nombre). Escribe su clave y toca «Cargar certificado»."
+            vm.mostrarMensaje = true
+        }
     }
 
     private func manejarImport(_ result: Result<[URL], Error>) {
