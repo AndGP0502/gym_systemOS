@@ -59,16 +59,20 @@ struct ConfiguracionView: View {
                     if let h = info.validoHasta { LabeledContent("Válido hasta", value: h) }
                     Button("Quitar certificado", role: .destructive) { vm.quitarCertificado() }
                 } else {
-                    Text("1) Escribe la clave del certificado. 2) Selecciona el archivo .p12.")
+                    Text("1) Selecciona el archivo .p12.  2) Escribe su clave.  3) Toca «Cargar certificado».")
                         .font(.caption).foregroundStyle(.secondary)
+                    // 1) Selección de archivo — SIEMPRE abre el selector.
+                    Button { mostrarPicker = true } label: {
+                        Label(vm.p12Nombre == nil ? "Seleccionar archivo .p12" : "Archivo: \(vm.p12Nombre!)",
+                              systemImage: vm.p12Nombre == nil ? "doc.badge.plus" : "checkmark.circle.fill")
+                    }
+                    // 2) Clave
                     SecureField("Clave del certificado", text: $vm.clave)
+                    // 3) Cargar
                     Button {
-                        if vm.clave.trimmingCharacters(in: .whitespaces).isEmpty {
-                            vm.mensaje = "Escribe primero la clave del certificado."; vm.mostrarMensaje = true
-                        } else {
-                            mostrarPicker = true
-                        }
-                    } label: { Label("Seleccionar archivo .p12", systemImage: "doc.badge.plus") }
+                        vm.cargarCertificado()
+                    } label: { Label("Cargar certificado", systemImage: "key.fill") }
+                        .disabled(vm.p12Data == nil)
                     Text("El certificado se guarda cifrado en el Keychain del dispositivo. Nunca se incluye en la app.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
@@ -178,7 +182,7 @@ struct ConfiguracionView: View {
             let acceso = url.startAccessingSecurityScopedResource()
             defer { if acceso { url.stopAccessingSecurityScopedResource() } }
             if let data = try? Data(contentsOf: url) {
-                vm.cargarCertificado(data: data)
+                vm.archivoSeleccionado(data: data, nombre: url.lastPathComponent)
             } else {
                 vm.mensaje = "No se pudo leer el archivo."; vm.mostrarMensaje = true
             }

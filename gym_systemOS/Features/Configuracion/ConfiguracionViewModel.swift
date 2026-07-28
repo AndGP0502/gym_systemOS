@@ -13,6 +13,8 @@ final class ConfiguracionViewModel: ObservableObject {
     @Published var certInfo: CertificateInfo?
     @Published var tieneCertificado = false
     @Published var clave = ""
+    @Published var p12Data: Data?          // archivo .p12 ya seleccionado (pendiente de cargar)
+    @Published var p12Nombre: String?      // nombre del archivo seleccionado
     @Published var mensaje: String?
     @Published var mostrarMensaje = false
 
@@ -37,14 +39,23 @@ final class ConfiguracionViewModel: ObservableObject {
         notificar(repo.guardar(config).mensaje)
     }
 
-    /// Importa el .p12 y lo guarda en Keychain (config en runtime).
-    func cargarCertificado(data: Data) {
+    /// Guarda el archivo .p12 elegido (aún sin importar; falta la clave).
+    func archivoSeleccionado(data: Data, nombre: String) {
+        p12Data = data
+        p12Nombre = nombre
+    }
+
+    /// Importa el .p12 seleccionado con la clave y lo guarda en Keychain (runtime).
+    func cargarCertificado() {
+        guard let data = p12Data else {
+            return notificar("Primero selecciona el archivo .p12.")
+        }
         do {
             let info = try CertificateStore.importAndSave(p12: data, password: clave)
             certInfo = info
             tieneCertificado = true
             config.rutaCertificado = "keychain"   // marcador; el .p12 vive en Keychain
-            clave = ""
+            clave = ""; p12Data = nil; p12Nombre = nil
             notificar("Certificado cargado: \(info.subject)")
         } catch {
             notificar(error.localizedDescription)
