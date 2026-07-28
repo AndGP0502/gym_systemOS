@@ -8,11 +8,18 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// Qué archivo se está eligiendo (un solo fileImporter para evitar que dos
+/// modificadores en la misma vista se anulen entre sí).
+private enum TipoImportacion: Identifiable, Hashable {
+    case certificado, baseDatos
+    var id: Int { hashValue }
+}
+
 struct ConfiguracionView: View {
     @Environment(\.appDatabase) private var db
     @EnvironmentObject private var inbox: CertificadoInbox
     @StateObject private var vm = ConfiguracionViewModel()
-    @State private var mostrarPicker = false
+    @State private var importando: TipoImportacion?
 
     /// Tipos aceptados al elegir el certificado: el UTI canónico de PKCS#12
     /// (`com.rsa.pkcs-12`, cubre .p12 y .pfx) + datos genéricos como respaldo,
@@ -21,11 +28,8 @@ struct ConfiguracionView: View {
         [UTType("com.rsa.pkcs-12"), UTType("com.apple.pkcs12"), .data, .item].compactMap { $0 }
     @State private var pin1 = ""
     @State private var pin2 = ""
-    @State private var compartirDB: IdentifiableURL?
-    @State private var mostrarImportDB = false
+    @State private var compartir: ShareItems?
     @State private var pinConfigurado = AppSettings.pinConfigurado
-    @State private var csvURLs: [URL] = []
-    @State private var mostrarCSVShare = false
     @State private var dropTargeted = false
 
     var body: some View {
@@ -64,7 +68,7 @@ struct ConfiguracionView: View {
                     Text("1) Trae tu .p12 (arrástralo aquí o usa «Seleccionar»).  2) Escribe su clave.  3) «Cargar certificado».")
                         .font(.caption).foregroundStyle(.secondary)
                     zonaArrastre
-                    Button { mostrarPicker = true } label: {
+                    Button { importando = .certificado } label: {
                         Label(vm.p12Nombre == nil ? "…o Seleccionar archivo .p12" : "Archivo: \(vm.p12Nombre!)",
                               systemImage: vm.p12Nombre == nil ? "doc.badge.plus" : "checkmark.circle.fill")
                     }
@@ -103,7 +107,7 @@ struct ConfiguracionView: View {
             Section("Respaldo de datos") {
                 Button { exportarBD() } label: { Label("Exportar base de datos (.db)", systemImage: "square.and.arrow.up") }
                 Button { exportarCSV() } label: { Label("Exportar a Excel (CSV)", systemImage: "tablecells") }
-                Button { mostrarImportDB = true } label: { Label("Importar base de datos", systemImage: "square.and.arrow.down") }
+                Button { importando = .baseDatos } label: { Label("Importar base de datos", systemImage: "square.and.arrow.down") }
                 Text("‘Excel (CSV)’ genera clientes.csv y suscripciones.csv (se abren en Excel/Numbers). La base .db conserva todo con el mismo esquema del escritorio. Tras importar, reinicia la app.")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -116,23 +120,25 @@ struct ConfiguracionView: View {
         }
         .task { vm.setup(db: db); consumirInbox() }
         .onChange(of: inbox.nombre) { _, _ in consumirInbox() }
-        .fileImporter(isPresented: $mostrarPicker,
-                      allowedContentTypes: Self.tiposP12,
+        // UN SOLO fileImporter (dos en la misma vista se anulan entre sí).
+        .fileImporter(isPresented: Binding(get: { importando != nil },
+                                           set: { if !$0 { importando = nil } }),
+                      allowedContentTypes: importando == .baseDatos ? [.database, .data] : Self.tiposP12,
                       allowsMultipleSelection: false) { result in
-            manejarImport(result)
+            switch importando {
+            case .baseDatos:   importarBD(result)
+            default:           manejarImport(result)
+            }
+            importando = nil
         }
-        .sheet(item: $compartirDB) { item in ShareSheet(items: [item.url]) }
-        .sheet(isPresented: $mostrarCSVShare) { ShareSheet(items: csvURLs) }
-        .fileImporter(isPresented: $mostrarImportDB,
-                      allowedContentTypes: [.database, .data],
-                      allowsMultipleSelection: false) { result in importarBD(result) }
+        .sheet(item: $compartir) { item in ShareSheet(items: item.urls) }
         .alert(vm.mensaje ?? "", isPresented: $vm.mostrarMensaje) { Button("OK", role: .cancel) {} }
     }
 
     private func exportarBD() {
         do {
             let url = try db.exportarCopia()
-            compartirDB = IdentifiableURL(url: url)
+            compartir = ShareItems(urls: [url])
         } catch {
             vm.mensaje = "No se pudo exportar: \(error.localizedDescription)"; vm.mostrarMensaje = true
         }
@@ -144,8 +150,7 @@ struct ConfiguracionView: View {
         var urls: [URL] = []
         if let u = CSVExport.archivo(cli, nombre: "clientes.csv") { urls.append(u) }
         if let u = CSVExport.archivo(sus, nombre: "suscripciones.csv") { urls.append(u) }
-        csvURLs = urls
-        mostrarCSVShare = !urls.isEmpty
+        if !urls.isEmpty { compartir = ShareItems(urls: urls) }
     }
 
     private func importarBD(_ result: Result<[URL], Error>) {

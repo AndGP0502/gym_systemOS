@@ -15,6 +15,12 @@ struct IdentifiableURL: Identifiable {
     let url: URL
 }
 
+/// Conjunto de archivos a compartir en una sola hoja (evita apilar `.sheet`).
+struct ShareItems: Identifiable {
+    let id = UUID()
+    let urls: [URL]
+}
+
 struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
     func makeUIViewController(context: Context) -> UIActivityViewController {
