@@ -98,6 +98,9 @@ enum CertificateStore {
         guard let identityAny = first[kSecImportItemIdentity as String] else {
             throw CertificateError.sinClavePrivada
         }
+        guard CFGetTypeID(identityAny as CFTypeRef) == SecIdentityGetTypeID() else {
+            throw CertificateError.p12Invalido
+        }
         let identity = identityAny as! SecIdentity
 
         var pk: SecKey?

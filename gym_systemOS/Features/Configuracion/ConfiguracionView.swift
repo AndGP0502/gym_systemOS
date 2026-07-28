@@ -12,6 +12,12 @@ struct ConfiguracionView: View {
     @Environment(\.appDatabase) private var db
     @StateObject private var vm = ConfiguracionViewModel()
     @State private var mostrarPicker = false
+
+    /// Tipos aceptados al elegir el certificado: el UTI canónico de PKCS#12
+    /// (`com.rsa.pkcs-12`, cubre .p12 y .pfx) + datos genéricos como respaldo,
+    /// para que el archivo nunca aparezca deshabilitado en el selector.
+    private static let tiposP12: [UTType] =
+        [UTType("com.rsa.pkcs-12"), UTType("com.apple.pkcs12"), .data, .item].compactMap { $0 }
     @State private var pin1 = ""
     @State private var pin2 = ""
     @State private var compartirDB: IdentifiableURL?
@@ -53,9 +59,15 @@ struct ConfiguracionView: View {
                     if let h = info.validoHasta { LabeledContent("Válido hasta", value: h) }
                     Button("Quitar certificado", role: .destructive) { vm.quitarCertificado() }
                 } else {
+                    Text("1) Escribe la clave del certificado. 2) Selecciona el archivo .p12.")
+                        .font(.caption).foregroundStyle(.secondary)
                     SecureField("Clave del certificado", text: $vm.clave)
                     Button {
-                        mostrarPicker = true
+                        if vm.clave.trimmingCharacters(in: .whitespaces).isEmpty {
+                            vm.mensaje = "Escribe primero la clave del certificado."; vm.mostrarMensaje = true
+                        } else {
+                            mostrarPicker = true
+                        }
                     } label: { Label("Seleccionar archivo .p12", systemImage: "doc.badge.plus") }
                     Text("El certificado se guarda cifrado en el Keychain del dispositivo. Nunca se incluye en la app.")
                         .font(.caption).foregroundStyle(.secondary)
@@ -100,15 +112,14 @@ struct ConfiguracionView: View {
         }
         .task { vm.setup(db: db) }
         .fileImporter(isPresented: $mostrarPicker,
-                      allowedContentTypes: [UTType(filenameExtension: "p12") ?? .data,
-                                            UTType(filenameExtension: "pfx") ?? .data],
+                      allowedContentTypes: Self.tiposP12,
                       allowsMultipleSelection: false) { result in
             manejarImport(result)
         }
         .sheet(item: $compartirDB) { item in ShareSheet(items: [item.url]) }
         .sheet(isPresented: $mostrarCSVShare) { ShareSheet(items: csvURLs) }
         .fileImporter(isPresented: $mostrarImportDB,
-                      allowedContentTypes: [UTType(filenameExtension: "db") ?? .data, .database],
+                      allowedContentTypes: [.database, .data],
                       allowsMultipleSelection: false) { result in importarBD(result) }
         .alert(vm.mensaje ?? "", isPresented: $vm.mostrarMensaje) { Button("OK", role: .cancel) {} }
     }
