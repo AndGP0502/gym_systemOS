@@ -194,7 +194,7 @@ private struct ClienteFormView: View {
                                autocap: .words)
                     CampoTexto(titulo: "Cédula (opcional)", ejemplo: "Ej: 0102030405", texto: $cedula,
                                keyboard: .numbersAndPunctuation)
-                    CampoTexto(titulo: "Teléfono", ejemplo: "Ej: 0991234567", texto: $telefono,
+                    CampoTexto(titulo: "Teléfono (opcional)", ejemplo: "Ej: 0991234567", texto: $telefono,
                                keyboard: .phonePad)
                     CampoTexto(titulo: "Correo (opcional)", ejemplo: "Ej: juan@correo.com", texto: $correo,
                                keyboard: .emailAddress, autocap: .never)

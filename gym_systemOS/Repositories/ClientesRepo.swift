@@ -29,8 +29,8 @@ struct ClientesRepo {
         let telefono = telefono.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if nombre.isEmpty { return .fallo("El nombre del cliente es obligatorio") }
-        if telefono.isEmpty { return .fallo("El teléfono es obligatorio") }
-        // La cédula es OPCIONAL. Solo se valida que no se repita si la escriben.
+        // Solo el nombre es obligatorio. Cédula y teléfono son OPCIONALES;
+        // la cédula solo se valida que no se repita si la escriben.
 
         do {
             return try db.dbWriter.write { dbc in
@@ -41,7 +41,9 @@ struct ClientesRepo {
                 }
 
                 var c = Cliente(id: try nuevoID(dbc),
-                                nombre: nombre, cedula: cedula.isEmpty ? nil : cedula, telefono: telefono,
+                                nombre: nombre,
+                                cedula: cedula.isEmpty ? nil : cedula,
+                                telefono: telefono.isEmpty ? nil : telefono,
                                 fechaRegistro: fechaRegistro ?? Fechas.hoyStr(),
                                 correo: correo)
                 try c.insert(dbc)
@@ -140,7 +142,8 @@ struct ClientesRepo {
                 try dbc.execute(sql: """
                     UPDATE clientes SET nombre=?, cedula=?, telefono=?, fecha_registro=?, correo=?
                     WHERE id=?
-                """, arguments: [nombre, cedula.isEmpty ? nil : cedula, telefono, fechaRegistro, correo, id])
+                """, arguments: [nombre, cedula.isEmpty ? nil : cedula,
+                                 telefono.isEmpty ? nil : telefono, fechaRegistro, correo, id])
                 return .exito("Cliente actualizado correctamente")
             }
         } catch {
