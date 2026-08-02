@@ -192,7 +192,7 @@ private struct ClienteFormView: View {
                 Section("Datos del cliente") {
                     CampoTexto(titulo: "Nombre completo", ejemplo: "Ej: Juan Pérez", texto: $nombre,
                                autocap: .words)
-                    CampoTexto(titulo: "Cédula", ejemplo: "Ej: 0102030405", texto: $cedula,
+                    CampoTexto(titulo: "Cédula (opcional)", ejemplo: "Ej: 0102030405", texto: $cedula,
                                keyboard: .numbersAndPunctuation)
                     CampoTexto(titulo: "Teléfono", ejemplo: "Ej: 0991234567", texto: $telefono,
                                keyboard: .phonePad)

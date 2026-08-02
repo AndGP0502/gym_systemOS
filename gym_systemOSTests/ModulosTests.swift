@@ -168,6 +168,23 @@ final class ModulosTests: XCTestCase {
         XCTAssertEqual(r.conDeuda, 1)
     }
 
+    // MARK: - Cédula opcional
+
+    func testCedulaOpcional() throws {
+        let db = nuevaDB()
+        let repo = ClientesRepo(db: db)
+        // Sin cédula → se permite
+        XCTAssertTrue(repo.agregar(nombre: "Sin Cédula 1", cedula: "", telefono: "1").ok)
+        // Otro sin cédula → también (no debe contar como duplicado)
+        XCTAssertTrue(repo.agregar(nombre: "Sin Cédula 2", cedula: "   ", telefono: "2").ok)
+        // Con cédula → se sigue validando duplicado
+        XCTAssertTrue(repo.agregar(nombre: "Con Cédula", cedula: "111", telefono: "3").ok)
+        XCTAssertFalse(repo.agregar(nombre: "Repetida", cedula: "111", telefono: "4").ok)
+        XCTAssertEqual(repo.ver().count, 3)
+        // El nombre sigue siendo obligatorio
+        XCTAssertFalse(repo.agregar(nombre: "", cedula: "999", telefono: "5").ok)
+    }
+
     // MARK: - Coherencia: borrado en cascada
 
     func testBorradoClienteEnCascada() throws {

@@ -29,17 +29,19 @@ struct ClientesRepo {
         let telefono = telefono.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if nombre.isEmpty { return .fallo("El nombre del cliente es obligatorio") }
-        if cedula.isEmpty { return .fallo("La cédula es obligatoria") }
         if telefono.isEmpty { return .fallo("El teléfono es obligatorio") }
+        // La cédula es OPCIONAL. Solo se valida que no se repita si la escriben.
 
         do {
             return try db.dbWriter.write { dbc in
-                let existe = try Int.fetchOne(dbc,
-                    sql: "SELECT 1 FROM clientes WHERE cedula = ?", arguments: [cedula]) != nil
-                if existe { return .fallo("Ya existe un cliente registrado con esa cédula") }
+                if !cedula.isEmpty {
+                    let existe = try Int.fetchOne(dbc,
+                        sql: "SELECT 1 FROM clientes WHERE cedula = ?", arguments: [cedula]) != nil
+                    if existe { return .fallo("Ya existe un cliente registrado con esa cédula") }
+                }
 
                 var c = Cliente(id: try nuevoID(dbc),
-                                nombre: nombre, cedula: cedula, telefono: telefono,
+                                nombre: nombre, cedula: cedula.isEmpty ? nil : cedula, telefono: telefono,
                                 fechaRegistro: fechaRegistro ?? Fechas.hoyStr(),
                                 correo: correo)
                 try c.insert(dbc)
@@ -124,17 +126,21 @@ struct ClientesRepo {
 
     func editar(id: Int64, nombre: String, cedula: String, telefono: String,
                 correo: String = "", fechaRegistro: String) -> OperationResult {
+        let cedula = cedula.trimmingCharacters(in: .whitespacesAndNewlines)
         do {
             return try db.dbWriter.write { dbc in
-                let dup = try Int.fetchOne(dbc,
-                    sql: "SELECT 1 FROM clientes WHERE cedula = ? AND id != ?",
-                    arguments: [cedula, id]) != nil
-                if dup { return .fallo("Ya existe otro cliente con esa cédula") }
+                // La cédula es opcional; solo se valida duplicado si la escriben.
+                if !cedula.isEmpty {
+                    let dup = try Int.fetchOne(dbc,
+                        sql: "SELECT 1 FROM clientes WHERE cedula = ? AND id != ?",
+                        arguments: [cedula, id]) != nil
+                    if dup { return .fallo("Ya existe otro cliente con esa cédula") }
+                }
 
                 try dbc.execute(sql: """
                     UPDATE clientes SET nombre=?, cedula=?, telefono=?, fecha_registro=?, correo=?
                     WHERE id=?
-                """, arguments: [nombre, cedula, telefono, fechaRegistro, correo, id])
+                """, arguments: [nombre, cedula.isEmpty ? nil : cedula, telefono, fechaRegistro, correo, id])
                 return .exito("Cliente actualizado correctamente")
             }
         } catch {
